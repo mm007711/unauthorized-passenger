@@ -1,0 +1,388 @@
+{
+  "title": "未许客",
+  "startNode": "prologue_001",
+  "defaultBackground": "bedroom",
+  "textTable": "Text/story_text_zh-CN.csv",
+  "artProfiles": [
+    {
+      "id": "default",
+      "displayName": "默认线稿",
+      "uiSkin": "LineSketch",
+      "backgroundFolder": "Backgrounds"
+    },
+    {
+      "id": "painted",
+      "displayName": "正式彩稿",
+      "uiSkin": "Painted",
+      "backgroundFolder": "Backgrounds_Painted"
+    }
+  ],
+  "languages": [
+    {
+      "id": "zh-CN",
+      "displayName": "简体中文",
+      "tablePath": "Localization/zh-CN.json",
+      "textTable": "Text/story_text_zh-CN.csv"
+    },
+    {
+      "id": "en",
+      "displayName": "English",
+      "tablePath": "Localization/en.json",
+      "textTable": "Text/story_text_en.csv"
+    },
+    {
+      "id": "ja",
+      "displayName": "日本語",
+      "tablePath": "Localization/ja.json",
+      "textTable": "Text/story_text_ja.csv"
+    }
+  ],
+  "backgrounds": [
+    {
+      "id": "bedroom",
+      "displayName": "卧室",
+      "path": "Backgrounds/bedroom_lineart.jpg"
+    },
+    {
+      "id": "living_room",
+      "displayName": "客厅",
+      "path": "Backgrounds/living_room_lineart.jpg"
+    },
+    {
+      "id": "entry",
+      "displayName": "玄关",
+      "path": "Backgrounds/entry_lineart.jpg"
+    }
+  ],
+  "explorePoints": [
+    {
+      "id": "bed",
+      "displayName": "床铺",
+      "scene": "bedroom",
+      "nodeId": "bed_001",
+      "background": "bedroom",
+      "x": 0.27,
+      "y": 0.43,
+      "width": 190,
+      "height": 48
+    },
+    {
+      "id": "desk",
+      "displayName": "书桌",
+      "scene": "bedroom",
+      "nodeId": "desk_001",
+      "background": "bedroom",
+      "x": 0.82,
+      "y": 0.38,
+      "width": 190,
+      "height": 48
+    },
+    {
+      "id": "living_room",
+      "displayName": "去客厅",
+      "scene": "bedroom",
+      "nodeId": "living_001",
+      "background": "living_room",
+      "x": 0.68,
+      "y": 0.52,
+      "width": 180,
+      "height": 46
+    },
+    {
+      "id": "entry",
+      "displayName": "去玄关",
+      "scene": "living_room",
+      "nodeId": "entry_001",
+      "background": "entry",
+      "x": 0.18,
+      "y": 0.52,
+      "width": 170,
+      "height": 46
+    },
+    {
+      "id": "tv",
+      "displayName": "电视",
+      "scene": "living_room",
+      "nodeId": "living_001",
+      "background": "living_room",
+      "x": 0.5,
+      "y": 0.52,
+      "width": 170,
+      "height": 46
+    },
+    {
+      "id": "back_to_bedroom",
+      "displayName": "回卧室",
+      "scene": "living_room",
+      "background": "bedroom",
+      "x": 0.82,
+      "y": 0.52,
+      "width": 170,
+      "height": 46
+    },
+    {
+      "id": "front_door",
+      "displayName": "大门",
+      "scene": "entry",
+      "nodeId": "entry_001",
+      "background": "entry",
+      "x": 0.52,
+      "y": 0.52,
+      "width": 170,
+      "height": 46
+    },
+    {
+      "id": "entry_to_living",
+      "displayName": "回客厅",
+      "scene": "entry",
+      "background": "living_room",
+      "x": 0.78,
+      "y": 0.52,
+      "width": 170,
+      "height": 46
+    }
+  ],
+  "nodes": [
+    {
+      "id": "prologue_001",
+      "speaker": "旁白",
+      "text": "我在一间陌生的房间里醒来。空气很轻，像纸面上还没有落稳的线。",
+      "background": "bedroom",
+      "nextId": "prologue_002",
+      "portraitSlot": "left",
+      "portraitCharacter": "test",
+      "portraitExpression": "neutral",
+      "portraitFacing": "auto",
+      "portraitAnimation": "fade"
+    },
+    {
+      "id": "prologue_002",
+      "speaker": "我",
+      "text": "这里不像梦。至少，梦不会把床头柜上的数字钟也画得这么认真。",
+      "nextId": "prologue_003",
+      "portraitSlot": "center",
+      "portraitCharacter": "test",
+      "portraitExpression": "surprised",
+      "portraitFacing": "auto",
+      "portraitAnimation": "pop"
+    },
+    {
+      "id": "prologue_003",
+      "speaker": "旁白",
+      "text": "我应该先看看四周。",
+      "commands": [
+        {
+          "command": "show_explore"
+        }
+      ],
+      "portraitSlot": "right",
+      "portraitCharacter": "test",
+      "portraitExpression": "neutral",
+      "portraitFacing": "auto",
+      "portraitAnimation": "none"
+    },
+    {
+      "id": "bed_001",
+      "speaker": "我",
+      "text": "床铺很整齐。枕头上有一点浅浅的凹陷，像是有人刚从这里坐起。",
+      "commands": [
+        {
+          "command": "set_flag",
+          "key": "checked_bed"
+        }
+      ],
+      "nextId": "bed_002",
+      "portraitSlot": "left",
+      "portraitCharacter": "test",
+      "portraitExpression": "sad",
+      "portraitFacing": "auto",
+      "portraitAnimation": "shake"
+    },
+    {
+      "id": "bed_002",
+      "speaker": "旁白",
+      "text": "你记住了第一个线索：醒来的地方。",
+      "commands": [
+        {
+          "command": "show_explore"
+        }
+      ],
+      "portraitSlot": "left",
+      "portraitCharacter": "test",
+      "portraitExpression": "neutral",
+      "portraitFacing": "auto",
+      "portraitAnimation": "none"
+    },
+    {
+      "id": "desk_001",
+      "speaker": "我",
+      "text": "书桌上放着一本摊开的笔记。最后一行写着：不要急着开门。",
+      "commands": [
+        {
+          "command": "set_flag",
+          "key": "checked_desk"
+        }
+      ],
+      "nextId": "desk_002",
+      "portraitSlot": "right",
+      "portraitCharacter": "test",
+      "portraitExpression": "surprised",
+      "portraitFacing": "auto",
+      "portraitAnimation": "shake"
+    },
+    {
+      "id": "desk_002",
+      "speaker": "旁白",
+      "text": "右上角的“存档”可以保存当前进度；“自动”和“跳过”可以控制对话节奏。",
+      "commands": [
+        {
+          "command": "show_explore"
+        }
+      ],
+      "portraitSlot": "right",
+      "portraitCharacter": "test",
+      "portraitExpression": "neutral",
+      "portraitFacing": "auto",
+      "portraitAnimation": "none"
+    },
+    {
+      "id": "living_001",
+      "speaker": "旁白",
+      "text": "视线穿过房门，客厅安静得像展示用的样板间。",
+      "background": "living_room",
+      "nextId": "living_002",
+      "portraitSlot": "center",
+      "portraitCharacter": "test",
+      "portraitExpression": "neutral",
+      "portraitFacing": "auto",
+      "portraitAnimation": "fade"
+    },
+    {
+      "id": "living_002",
+      "speaker": "我",
+      "text": "电视没有打开。黑色屏幕里只映出我的轮廓。",
+      "commands": [
+        {
+          "command": "set_flag",
+          "key": "checked_tv"
+        },
+        {
+          "command": "show_explore"
+        }
+      ],
+      "portraitSlot": "center",
+      "portraitCharacter": "test",
+      "portraitExpression": "sad",
+      "portraitFacing": "auto",
+      "portraitAnimation": "shake"
+    },
+    {
+      "id": "entry_001",
+      "speaker": "旁白",
+      "text": "玄关的门关着。锁舌严丝合缝，旁边贴着一张小纸条。",
+      "background": "entry",
+      "nextId": "entry_002",
+      "portraitSlot": "right",
+      "portraitCharacter": "test",
+      "portraitExpression": "neutral",
+      "portraitFacing": "auto",
+      "portraitAnimation": "fade"
+    },
+    {
+      "id": "entry_002",
+      "speaker": "纸条",
+      "text": "门的答案不是数字，是你醒来的地方。",
+      "commands": [
+        {
+          "command": "set_flag",
+          "key": "read_message"
+        }
+      ],
+      "choices": [
+        {
+          "text": "回答：BED",
+          "nextId": "ending_001",
+          "requiredFlag": "checked_bed"
+        },
+        {
+          "text": "线索还不够，继续探索",
+          "commands": [
+            {
+              "command": "show_explore"
+            }
+          ]
+        },
+        {
+          "text": "保存当前进度",
+          "nextId": "entry_002",
+          "commands": [
+            {
+              "command": "save"
+            }
+          ]
+        }
+      ],
+      "portraitSlot": "right",
+      "portraitCharacter": "test",
+      "portraitExpression": "angry",
+      "portraitFacing": "auto",
+      "portraitAnimation": "pop"
+    },
+    {
+      "id": "ending_001",
+      "speaker": "我",
+      "text": "是床。我醒来的地方，也是这个房间留给我的答案。",
+      "commands": [
+        {
+          "command": "set_flag",
+          "key": "door_opened"
+        }
+      ],
+      "nextId": "ending_002",
+      "portraitSlot": "center",
+      "portraitCharacter": "test",
+      "portraitExpression": "happy",
+      "portraitFacing": "auto",
+      "portraitAnimation": "pop"
+    },
+    {
+      "id": "ending_002",
+      "speaker": "旁白",
+      "text": "门锁轻轻响了一声。线稿外的世界，还没有被画出来。",
+      "choices": [
+        {
+          "text": "回到标题",
+          "commands": [
+            {
+              "command": "main_menu"
+            }
+          ]
+        },
+        {
+          "text": "继续探索",
+          "commands": [
+            {
+              "command": "show_explore"
+            }
+          ]
+        }
+      ],
+      "portraitSlot": "center",
+      "portraitCharacter": "test",
+      "portraitExpression": "neutral",
+      "portraitFacing": "auto",
+      "portraitAnimation": "fade"
+    }
+  ],
+  "portraits": [
+    {
+      "id": "test",
+      "displayName": "测试角色 / Test Speaker / テスト役",
+      "folder": "Portraits/test",
+      "defaultExpression": "neutral",
+      "width": 520,
+      "height": 900,
+      "scale": 1
+    }
+  ]
+}

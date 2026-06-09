@@ -1,0 +1,5 @@
+{
+  "language": "zh-CN",
+  "displayName": "简体中文",
+  "notes": "预留多语言表。后续可以把节点 id、speaker、text、choice 文案映射到这里。"
+}

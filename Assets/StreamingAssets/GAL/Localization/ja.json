@@ -1,0 +1,5 @@
+﻿{
+  "language": "ja",
+  "displayName": "日本語",
+  "notes": "Reserved localization metadata. Runtime text is currently read from Text/story_text.csv columns ja.speaker and ja.text."
+}

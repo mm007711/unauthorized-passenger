@@ -1,0 +1,5 @@
+{
+  "language": "en",
+  "displayName": "English",
+  "notes": "Reserved localization table. Later we can map node ids, speakers, dialogue text, and choice text here."
+}
