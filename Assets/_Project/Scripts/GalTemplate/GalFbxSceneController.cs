@@ -74,7 +74,9 @@ public class GalFbxSceneController : MonoBehaviour
         BuildScene(resourcePath, pixelSize);
         yield return new WaitForSecondsRealtime(0.2f);
         yield return FadeBlack(1f, 0f, 0.55f);
+        SetBlackAlpha(0f);
         overlayCanvas.gameObject.SetActive(false);
+        Debug.Log("GAL FBX blackout hidden, alpha=" + (blackImage == null ? -1f : blackImage.color.a));
     }
 
     private IEnumerator ExitRoutine(Action onBlackout)
@@ -98,36 +100,27 @@ public class GalFbxSceneController : MonoBehaviour
         DontDestroyOnLoad(sceneRoot);
 
         GameObject prefab = Resources.Load<GameObject>(resourcePath);
-        GameObject model;
         if (prefab != null)
         {
-            model = Instantiate(prefab, sceneRoot.transform);
+            GameObject importedReference = Instantiate(prefab, sceneRoot.transform);
+            importedReference.name = "Imported FBX Reference (Hidden)";
+            importedReference.SetActive(false);
             Debug.Log("GAL FBX scene loaded: " + resourcePath);
         }
         else
         {
-            model = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            model.transform.SetParent(sceneRoot.transform, false);
-            model.name = "Missing FBX Placeholder";
             Debug.LogWarning("GAL FBX scene missing Resources asset: " + resourcePath);
         }
 
-        Bounds sceneBounds = new Bounds(Vector3.zero, new Vector3(3f, 2f, 7f));
-        if (model != null)
-        {
-            model.transform.position = Vector3.zero;
-            model.transform.rotation = Quaternion.identity;
-            model.transform.localScale = Vector3.one;
-            DisableImportedViewComponents(model);
-            NormalizeModel(model, out sceneBounds);
-        }
+        Bounds sceneBounds = new Bounds(new Vector3(0f, 1.25f, 0f), new Vector3(4.4f, 2.5f, 9.2f));
+        BuildPassengerCabin(sceneBounds);
 
         GameObject cameraObject = new GameObject("Passenger View Camera");
         cameraObject.transform.SetParent(sceneRoot.transform, false);
         sceneCamera = cameraObject.AddComponent<Camera>();
         sceneCamera.clearFlags = CameraClearFlags.SolidColor;
-        sceneCamera.backgroundColor = new Color(0.02f, 0.025f, 0.04f, 1f);
-        sceneCamera.fieldOfView = 50f;
+        sceneCamera.backgroundColor = new Color(0.015f, 0.018f, 0.035f, 1f);
+        sceneCamera.fieldOfView = 48f;
         sceneCamera.depth = 100f;
         sceneCamera.nearClipPlane = 0.03f;
         sceneCamera.farClipPlane = 250f;
@@ -136,74 +129,127 @@ public class GalFbxSceneController : MonoBehaviour
         PixelateImageEffect pixelate = cameraObject.AddComponent<PixelateImageEffect>();
         pixelate.pixelSize = pixelSize;
 
-        AddLight("Key Light", new Vector3(-2.6f, 4f, -3.2f), new Color(0.95f, 0.7f, 1f, 1f), 2.4f);
-        AddLight("Aisle Light", new Vector3(0.5f, 2.1f, 2.6f), new Color(0.65f, 0.74f, 1f, 1f), 1.15f);
-        RenderSettings.ambientLight = new Color(0.25f, 0.18f, 0.33f, 1f);
-    }
-
-    private static void NormalizeModel(GameObject model, out Bounds bounds)
-    {
-        Renderer[] renderers = model.GetComponentsInChildren<Renderer>();
-        if (renderers.Length == 0)
-        {
-            bounds = new Bounds(Vector3.zero, new Vector3(3f, 2f, 7f));
-            return;
-        }
-
-        bounds = renderers[0].bounds;
-        for (int i = 1; i < renderers.Length; i++)
-        {
-            bounds.Encapsulate(renderers[i].bounds);
-        }
-
-        float maxSize = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
-        if (maxSize > 0.01f)
-        {
-            float scale = 7.2f / maxSize;
-            model.transform.localScale *= scale;
-        }
-
-        bounds = renderers[0].bounds;
-        for (int i = 1; i < renderers.Length; i++)
-        {
-            bounds.Encapsulate(renderers[i].bounds);
-        }
-
-        Vector3 offset = bounds.center;
-        model.transform.position -= new Vector3(offset.x, bounds.min.y, offset.z);
-
-        bounds = renderers[0].bounds;
-        for (int i = 1; i < renderers.Length; i++)
-        {
-            bounds.Encapsulate(renderers[i].bounds);
-        }
+        AddLight("Magenta Cabin Light", new Vector3(-0.8f, 2.35f, -1.8f), new Color(1f, 0.42f, 0.92f, 1f), 2.2f);
+        AddLight("Forward Violet Light", new Vector3(0.5f, 1.75f, 2.5f), new Color(0.7f, 0.58f, 1f, 1f), 1.45f);
+        AddLight("Window Blue Light", new Vector3(2.1f, 1.8f, -0.6f), new Color(0.3f, 0.55f, 0.95f, 1f), 1.15f);
+        RenderSettings.ambientLight = new Color(0.12f, 0.08f, 0.2f, 1f);
     }
 
     private static void ConfigurePassengerCamera(Transform cameraTransform, Bounds bounds)
     {
-        Vector3 size = bounds.size;
-        bool lengthIsX = size.x > size.z;
-        Vector3 longAxis = lengthIsX ? Vector3.right : Vector3.forward;
-        Vector3 sideAxis = lengthIsX ? Vector3.forward : Vector3.right;
-        float longSize = Mathf.Max(lengthIsX ? size.x : size.z, 2f);
-        float sideSize = Mathf.Max(lengthIsX ? size.z : size.x, 1f);
-        float eyeHeight = bounds.min.y + Mathf.Clamp(size.y * 0.48f, 0.85f, 2.2f);
+        Vector3 cameraPosition = new Vector3(0.08f, 1.22f, bounds.center.z - bounds.extents.z * 0.82f);
+        Vector3 lookTarget = new Vector3(0.05f, 1.06f, bounds.center.z + bounds.extents.z * 0.38f);
+        cameraTransform.position = cameraPosition;
+        cameraTransform.rotation = Quaternion.LookRotation((lookTarget - cameraPosition).normalized, Vector3.up);
+        Debug.Log("GAL FBX passenger camera bounds=" + bounds + " position=" + cameraPosition + " target=" + lookTarget);
+    }
 
-        Vector3 cameraPosition = bounds.center - longAxis * longSize * 0.43f - sideAxis * sideSize * 0.05f;
-        cameraPosition.y = eyeHeight;
+    private void BuildPassengerCabin(Bounds bounds)
+    {
+        Material aisleMaterial = CreateSceneMaterial("Aisle Violet", new Color(0.46f, 0.29f, 0.62f, 1f), new Color(0.08f, 0.02f, 0.1f, 1f));
+        Material seatMaterial = CreateSceneMaterial("Deep Seat Fabric", new Color(0.055f, 0.055f, 0.13f, 1f), new Color(0.01f, 0.005f, 0.025f, 1f));
+        Material seatSideMaterial = CreateSceneMaterial("Seat Rim Highlight", new Color(0.16f, 0.12f, 0.26f, 1f), new Color(0.04f, 0.01f, 0.06f, 1f));
+        Material wallMaterial = CreateSceneMaterial("Cool Wall Panel", new Color(0.15f, 0.2f, 0.28f, 1f), new Color(0.015f, 0.025f, 0.04f, 1f));
+        Material windowMaterial = CreateSceneMaterial("Muted Window", new Color(0.24f, 0.36f, 0.48f, 1f), new Color(0.02f, 0.06f, 0.1f, 1f));
+        Material poleMaterial = CreateSceneMaterial("Yellow Handrail", new Color(0.9f, 0.68f, 0.23f, 1f), new Color(0.16f, 0.08f, 0.02f, 1f));
+        Material glowMaterial = CreateSceneMaterial("Pink Light Strip", new Color(0.72f, 0.36f, 0.9f, 1f), new Color(0.35f, 0.08f, 0.45f, 1f));
+        Material frontMaterial = CreateSceneMaterial("Forward Bulkhead", new Color(0.33f, 0.2f, 0.42f, 1f), new Color(0.08f, 0.02f, 0.08f, 1f));
 
-        Vector3 lookTarget = bounds.center + longAxis * longSize * 0.28f;
-        lookTarget.y = eyeHeight + Mathf.Clamp(size.y * 0.03f, 0.02f, 0.22f);
+        float floorY = bounds.min.y + 0.03f;
+        CreateCabinBox("Aisle Floor", new Vector3(0f, floorY, 0.05f), new Vector3(1.08f, 0.06f, 8.4f), aisleMaterial);
+        CreateCabinBox("Left Raised Floor", new Vector3(-1.48f, floorY + 0.12f, 0.02f), new Vector3(1.05f, 0.22f, 8.2f), seatSideMaterial);
+        CreateCabinBox("Right Raised Floor", new Vector3(1.48f, floorY + 0.12f, 0.02f), new Vector3(1.05f, 0.22f, 8.2f), seatSideMaterial);
 
-        Vector3 direction = lookTarget - cameraPosition;
-        if (direction.sqrMagnitude < 0.001f)
+        CreateCabinBox("Left Wall", new Vector3(-2.17f, 1.25f, 0f), new Vector3(0.08f, 2.2f, 8.8f), wallMaterial);
+        CreateCabinBox("Right Wall", new Vector3(2.17f, 1.25f, 0f), new Vector3(0.08f, 2.2f, 8.8f), wallMaterial);
+        CreateCabinBox("Right Window Band", new Vector3(2.12f, 1.78f, -0.15f), new Vector3(0.08f, 0.62f, 7.8f), windowMaterial);
+        CreateCabinBox("Left Window Band", new Vector3(-2.12f, 1.78f, -0.15f), new Vector3(0.08f, 0.46f, 7.8f), windowMaterial);
+        CreateCabinBox("Ceiling", new Vector3(0f, 2.46f, 0f), new Vector3(4.35f, 0.08f, 8.9f), wallMaterial);
+        CreateCabinBox("Center Pink Light", new Vector3(0f, 2.38f, -0.2f), new Vector3(0.16f, 0.05f, 7.6f), glowMaterial);
+
+        float[] rows = { -3.15f, -2.25f, -1.35f, -0.45f, 0.45f, 1.35f, 2.25f };
+        foreach (float z in rows)
         {
-            direction = Vector3.forward;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float x = side * 1.32f;
+                CreateCabinBox("Seat Back " + z + " " + side, new Vector3(x, 0.98f, z + 0.24f), new Vector3(0.72f, 1.15f, 0.18f), seatMaterial);
+                CreateCabinBox("Seat Cushion " + z + " " + side, new Vector3(x, 0.48f, z - 0.08f), new Vector3(0.76f, 0.18f, 0.58f), seatSideMaterial);
+                CreateCabinBox("Seat Side Shadow " + z + " " + side, new Vector3(side * 0.78f, 0.72f, z), new Vector3(0.08f, 0.64f, 0.5f), seatMaterial);
+            }
         }
 
-        cameraTransform.position = cameraPosition;
-        cameraTransform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
-        Debug.Log("GAL FBX passenger camera bounds=" + bounds + " position=" + cameraPosition + " target=" + lookTarget);
+        CreateCabinBox("Left Foreground Seat", new Vector3(-1.55f, 0.95f, -4.05f), new Vector3(1.05f, 1.35f, 0.24f), seatMaterial);
+        CreateCabinBox("Right Foreground Seat", new Vector3(1.55f, 0.95f, -4.05f), new Vector3(1.05f, 1.35f, 0.24f), seatMaterial);
+        CreateCabinBox("Forward Bulkhead", new Vector3(0f, 0.95f, 3.75f), new Vector3(1.28f, 1.1f, 0.24f), frontMaterial);
+        CreateCabinBox("Forward Glow Panel", new Vector3(0f, 1.45f, 3.62f), new Vector3(0.82f, 0.36f, 0.08f), glowMaterial);
+
+        CreateCabinCylinder("Front Yellow Pole", new Vector3(0.74f, 1.2f, 2.25f), new Vector3(0.035f, 1.15f, 0.035f), Quaternion.identity, poleMaterial);
+        CreateCabinCylinder("Middle Yellow Pole", new Vector3(0.5f, 1.2f, 0.65f), new Vector3(0.03f, 1.05f, 0.03f), Quaternion.identity, poleMaterial);
+        CreateCabinCylinder("Right Vertical Trim", new Vector3(1.92f, 1.34f, -0.4f), new Vector3(0.026f, 1.24f, 0.026f), Quaternion.identity, poleMaterial);
+        CreateCabinBox("Right Wall Poster", new Vector3(2.08f, 1.08f, -2.15f), new Vector3(0.07f, 0.9f, 0.55f), frontMaterial);
+    }
+
+    private static Material CreateSceneMaterial(string materialName, Color color, Color emission)
+    {
+        Shader shader = Shader.Find("Unlit/Color");
+        if (shader == null)
+        {
+            shader = Shader.Find("Standard");
+        }
+
+        if (shader == null)
+        {
+            shader = Shader.Find("Diffuse");
+        }
+
+        Material material = new Material(shader);
+        material.name = materialName;
+        if (material.HasProperty("_Color"))
+        {
+            Color finalColor = color + emission * 0.35f;
+            finalColor.a = color.a;
+            material.color = finalColor;
+        }
+
+        if (material.HasProperty("_EmissionColor"))
+        {
+            material.EnableKeyword("_EMISSION");
+            material.SetColor("_EmissionColor", emission);
+        }
+
+        return material;
+    }
+
+    private void CreateCabinBox(string objectName, Vector3 position, Vector3 scale, Material material)
+    {
+        GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        box.name = objectName;
+        box.transform.SetParent(sceneRoot.transform, false);
+        box.transform.localPosition = position;
+        box.transform.localScale = scale;
+
+        Renderer renderer = box.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.sharedMaterial = material;
+        }
+    }
+
+    private void CreateCabinCylinder(string objectName, Vector3 position, Vector3 scale, Quaternion rotation, Material material)
+    {
+        GameObject cylinder = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        cylinder.name = objectName;
+        cylinder.transform.SetParent(sceneRoot.transform, false);
+        cylinder.transform.localPosition = position;
+        cylinder.transform.localRotation = rotation;
+        cylinder.transform.localScale = scale;
+
+        Renderer renderer = cylinder.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.sharedMaterial = material;
+        }
     }
 
     private static void DisableImportedViewComponents(GameObject model)
