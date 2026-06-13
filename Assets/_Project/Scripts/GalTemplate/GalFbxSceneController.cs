@@ -100,11 +100,14 @@ public class GalFbxSceneController : MonoBehaviour
         DontDestroyOnLoad(sceneRoot);
 
         GameObject prefab = Resources.Load<GameObject>(resourcePath);
+        GameObject importedScene = null;
         if (prefab != null)
         {
-            GameObject importedReference = Instantiate(prefab, sceneRoot.transform);
-            importedReference.name = "Imported FBX Reference (Hidden)";
-            importedReference.SetActive(false);
+            importedScene = Instantiate(prefab, sceneRoot.transform);
+            importedScene.name = "Imported FBX Scene";
+            importedScene.transform.localPosition = Vector3.zero;
+            importedScene.transform.localRotation = Quaternion.identity;
+            importedScene.transform.localScale = Vector3.one;
             Debug.Log("GAL FBX scene loaded: " + resourcePath);
         }
         else
@@ -112,159 +115,181 @@ public class GalFbxSceneController : MonoBehaviour
             Debug.LogWarning("GAL FBX scene missing Resources asset: " + resourcePath);
         }
 
-        Bounds sceneBounds = new Bounds(new Vector3(0f, 1.25f, 0f), new Vector3(4.4f, 2.5f, 9.2f));
-        BuildPassengerCabin(sceneBounds);
-
-        GameObject cameraObject = new GameObject("Passenger View Camera");
-        cameraObject.transform.SetParent(sceneRoot.transform, false);
-        sceneCamera = cameraObject.AddComponent<Camera>();
-        sceneCamera.clearFlags = CameraClearFlags.SolidColor;
-        sceneCamera.backgroundColor = new Color(0.015f, 0.018f, 0.035f, 1f);
-        sceneCamera.fieldOfView = 48f;
-        sceneCamera.depth = 100f;
-        sceneCamera.nearClipPlane = 0.03f;
-        sceneCamera.farClipPlane = 250f;
-        ConfigurePassengerCamera(cameraObject.transform, sceneBounds);
-
-        PixelateImageEffect pixelate = cameraObject.AddComponent<PixelateImageEffect>();
-        pixelate.pixelSize = pixelSize;
-
-        AddLight("Magenta Cabin Light", new Vector3(-0.8f, 2.35f, -1.8f), new Color(1f, 0.42f, 0.92f, 1f), 2.2f);
-        AddLight("Forward Violet Light", new Vector3(0.5f, 1.75f, 2.5f), new Color(0.7f, 0.58f, 1f, 1f), 1.45f);
-        AddLight("Window Blue Light", new Vector3(2.1f, 1.8f, -0.6f), new Color(0.3f, 0.55f, 0.95f, 1f), 1.15f);
-        RenderSettings.ambientLight = new Color(0.12f, 0.08f, 0.2f, 1f);
-    }
-
-    private static void ConfigurePassengerCamera(Transform cameraTransform, Bounds bounds)
-    {
-        Vector3 cameraPosition = new Vector3(0.08f, 1.22f, bounds.center.z - bounds.extents.z * 0.82f);
-        Vector3 lookTarget = new Vector3(0.05f, 1.06f, bounds.center.z + bounds.extents.z * 0.38f);
-        cameraTransform.position = cameraPosition;
-        cameraTransform.rotation = Quaternion.LookRotation((lookTarget - cameraPosition).normalized, Vector3.up);
-        Debug.Log("GAL FBX passenger camera bounds=" + bounds + " position=" + cameraPosition + " target=" + lookTarget);
-    }
-
-    private void BuildPassengerCabin(Bounds bounds)
-    {
-        Material aisleMaterial = CreateSceneMaterial("Aisle Violet", new Color(0.46f, 0.29f, 0.62f, 1f), new Color(0.08f, 0.02f, 0.1f, 1f));
-        Material seatMaterial = CreateSceneMaterial("Deep Seat Fabric", new Color(0.055f, 0.055f, 0.13f, 1f), new Color(0.01f, 0.005f, 0.025f, 1f));
-        Material seatSideMaterial = CreateSceneMaterial("Seat Rim Highlight", new Color(0.16f, 0.12f, 0.26f, 1f), new Color(0.04f, 0.01f, 0.06f, 1f));
-        Material wallMaterial = CreateSceneMaterial("Cool Wall Panel", new Color(0.15f, 0.2f, 0.28f, 1f), new Color(0.015f, 0.025f, 0.04f, 1f));
-        Material windowMaterial = CreateSceneMaterial("Muted Window", new Color(0.24f, 0.36f, 0.48f, 1f), new Color(0.02f, 0.06f, 0.1f, 1f));
-        Material poleMaterial = CreateSceneMaterial("Yellow Handrail", new Color(0.9f, 0.68f, 0.23f, 1f), new Color(0.16f, 0.08f, 0.02f, 1f));
-        Material glowMaterial = CreateSceneMaterial("Pink Light Strip", new Color(0.72f, 0.36f, 0.9f, 1f), new Color(0.35f, 0.08f, 0.45f, 1f));
-        Material frontMaterial = CreateSceneMaterial("Forward Bulkhead", new Color(0.33f, 0.2f, 0.42f, 1f), new Color(0.08f, 0.02f, 0.08f, 1f));
-
-        float floorY = bounds.min.y + 0.03f;
-        CreateCabinBox("Aisle Floor", new Vector3(0f, floorY, 0.05f), new Vector3(1.08f, 0.06f, 8.4f), aisleMaterial);
-        CreateCabinBox("Left Raised Floor", new Vector3(-1.48f, floorY + 0.12f, 0.02f), new Vector3(1.05f, 0.22f, 8.2f), seatSideMaterial);
-        CreateCabinBox("Right Raised Floor", new Vector3(1.48f, floorY + 0.12f, 0.02f), new Vector3(1.05f, 0.22f, 8.2f), seatSideMaterial);
-
-        CreateCabinBox("Left Wall", new Vector3(-2.17f, 1.25f, 0f), new Vector3(0.08f, 2.2f, 8.8f), wallMaterial);
-        CreateCabinBox("Right Wall", new Vector3(2.17f, 1.25f, 0f), new Vector3(0.08f, 2.2f, 8.8f), wallMaterial);
-        CreateCabinBox("Right Window Band", new Vector3(2.12f, 1.78f, -0.15f), new Vector3(0.08f, 0.62f, 7.8f), windowMaterial);
-        CreateCabinBox("Left Window Band", new Vector3(-2.12f, 1.78f, -0.15f), new Vector3(0.08f, 0.46f, 7.8f), windowMaterial);
-        CreateCabinBox("Ceiling", new Vector3(0f, 2.46f, 0f), new Vector3(4.35f, 0.08f, 8.9f), wallMaterial);
-        CreateCabinBox("Center Pink Light", new Vector3(0f, 2.38f, -0.2f), new Vector3(0.16f, 0.05f, 7.6f), glowMaterial);
-
-        float[] rows = { -3.15f, -2.25f, -1.35f, -0.45f, 0.45f, 1.35f, 2.25f };
-        foreach (float z in rows)
+        int lightCount = EnableImportedLights(importedScene);
+        sceneCamera = SelectImportedCamera(importedScene);
+        if (sceneCamera != null)
         {
-            for (int side = -1; side <= 1; side += 2)
+            ConfigureImportedCamera(sceneCamera);
+        }
+        else
+        {
+            Bounds sceneBounds = GetSceneBounds(importedScene);
+            sceneCamera = CreateFallbackCamera(sceneBounds);
+        }
+
+        if (sceneCamera != null)
+        {
+            PixelateImageEffect pixelate = sceneCamera.GetComponent<PixelateImageEffect>();
+            if (pixelate == null)
             {
-                float x = side * 1.32f;
-                CreateCabinBox("Seat Back " + z + " " + side, new Vector3(x, 0.98f, z + 0.24f), new Vector3(0.72f, 1.15f, 0.18f), seatMaterial);
-                CreateCabinBox("Seat Cushion " + z + " " + side, new Vector3(x, 0.48f, z - 0.08f), new Vector3(0.76f, 0.18f, 0.58f), seatSideMaterial);
-                CreateCabinBox("Seat Side Shadow " + z + " " + side, new Vector3(side * 0.78f, 0.72f, z), new Vector3(0.08f, 0.64f, 0.5f), seatMaterial);
+                pixelate = sceneCamera.gameObject.AddComponent<PixelateImageEffect>();
+            }
+
+            pixelate.pixelSize = pixelSize;
+        }
+
+        if (lightCount == 0)
+        {
+            AddLight("FBX Fallback Key Light", new Vector3(0f, 3.2f, -2.2f), new Color(0.95f, 0.82f, 1f, 1f), 1.4f);
+            AddLight("FBX Fallback Fill Light", new Vector3(2f, 1.8f, 1.8f), new Color(0.45f, 0.65f, 1f, 1f), 0.85f);
+            RenderSettings.ambientLight = new Color(0.22f, 0.2f, 0.28f, 1f);
+        }
+    }
+
+    private static Camera SelectImportedCamera(GameObject importedScene)
+    {
+        if (importedScene == null)
+        {
+            return null;
+        }
+
+        Camera[] cameras = importedScene.GetComponentsInChildren<Camera>(true);
+        if (cameras.Length == 0)
+        {
+            return null;
+        }
+
+        Camera selected = cameras[0];
+        foreach (Camera camera in cameras)
+        {
+            if (camera != null && camera.name.ToLowerInvariant().Contains("camera"))
+            {
+                selected = camera;
+                break;
             }
         }
 
-        CreateCabinBox("Left Foreground Seat", new Vector3(-1.55f, 0.95f, -4.05f), new Vector3(1.05f, 1.35f, 0.24f), seatMaterial);
-        CreateCabinBox("Right Foreground Seat", new Vector3(1.55f, 0.95f, -4.05f), new Vector3(1.05f, 1.35f, 0.24f), seatMaterial);
-        CreateCabinBox("Forward Bulkhead", new Vector3(0f, 0.95f, 3.75f), new Vector3(1.28f, 1.1f, 0.24f), frontMaterial);
-        CreateCabinBox("Forward Glow Panel", new Vector3(0f, 1.45f, 3.62f), new Vector3(0.82f, 0.36f, 0.08f), glowMaterial);
+        foreach (Camera camera in cameras)
+        {
+            if (camera == null)
+            {
+                continue;
+            }
 
-        CreateCabinCylinder("Front Yellow Pole", new Vector3(0.74f, 1.2f, 2.25f), new Vector3(0.035f, 1.15f, 0.035f), Quaternion.identity, poleMaterial);
-        CreateCabinCylinder("Middle Yellow Pole", new Vector3(0.5f, 1.2f, 0.65f), new Vector3(0.03f, 1.05f, 0.03f), Quaternion.identity, poleMaterial);
-        CreateCabinCylinder("Right Vertical Trim", new Vector3(1.92f, 1.34f, -0.4f), new Vector3(0.026f, 1.24f, 0.026f), Quaternion.identity, poleMaterial);
-        CreateCabinBox("Right Wall Poster", new Vector3(2.08f, 1.08f, -2.15f), new Vector3(0.07f, 0.9f, 0.55f), frontMaterial);
+            camera.gameObject.SetActive(true);
+            camera.enabled = camera == selected;
+        }
+
+        Debug.Log("GAL FBX using imported camera: " + GetHierarchyPath(selected.transform));
+        return selected;
     }
 
-    private static Material CreateSceneMaterial(string materialName, Color color, Color emission)
+    private static void ConfigureImportedCamera(Camera camera)
     {
-        Shader shader = Shader.Find("Unlit/Color");
-        if (shader == null)
+        if (camera == null)
         {
-            shader = Shader.Find("Standard");
+            return;
         }
 
-        if (shader == null)
-        {
-            shader = Shader.Find("Diffuse");
-        }
-
-        Material material = new Material(shader);
-        material.name = materialName;
-        if (material.HasProperty("_Color"))
-        {
-            Color finalColor = color + emission * 0.35f;
-            finalColor.a = color.a;
-            material.color = finalColor;
-        }
-
-        if (material.HasProperty("_EmissionColor"))
-        {
-            material.EnableKeyword("_EMISSION");
-            material.SetColor("_EmissionColor", emission);
-        }
-
-        return material;
+        camera.gameObject.SetActive(true);
+        camera.enabled = true;
+        camera.targetTexture = null;
+        camera.depth = 100f;
+        camera.nearClipPlane = Mathf.Max(0.01f, camera.nearClipPlane);
+        camera.farClipPlane = Mathf.Max(100f, camera.farClipPlane);
+        camera.rect = new Rect(0f, 0f, 1f, 1f);
     }
 
-    private void CreateCabinBox(string objectName, Vector3 position, Vector3 scale, Material material)
+    private Camera CreateFallbackCamera(Bounds bounds)
     {
-        GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        box.name = objectName;
-        box.transform.SetParent(sceneRoot.transform, false);
-        box.transform.localPosition = position;
-        box.transform.localScale = scale;
+        GameObject cameraObject = new GameObject("Fallback FBX Camera");
+        cameraObject.transform.SetParent(sceneRoot.transform, false);
+        Camera camera = cameraObject.AddComponent<Camera>();
+        camera.clearFlags = CameraClearFlags.SolidColor;
+        camera.backgroundColor = new Color(0.02f, 0.025f, 0.04f, 1f);
+        camera.fieldOfView = 50f;
+        camera.depth = 100f;
+        camera.nearClipPlane = 0.03f;
+        camera.farClipPlane = 250f;
 
-        Renderer renderer = box.GetComponent<Renderer>();
-        if (renderer != null)
-        {
-            renderer.sharedMaterial = material;
-        }
+        Vector3 size = bounds.size;
+        bool lengthIsX = size.x > size.z;
+        Vector3 longAxis = lengthIsX ? Vector3.right : Vector3.forward;
+        Vector3 sideAxis = lengthIsX ? Vector3.forward : Vector3.right;
+        float longSize = Mathf.Max(lengthIsX ? size.x : size.z, 2f);
+        float sideSize = Mathf.Max(lengthIsX ? size.z : size.x, 1f);
+        float eyeHeight = bounds.min.y + Mathf.Clamp(size.y * 0.48f, 0.85f, 2.2f);
+        Vector3 cameraPosition = bounds.center - longAxis * longSize * 0.42f - sideAxis * sideSize * 0.05f;
+        cameraPosition.y = eyeHeight;
+        Vector3 lookTarget = bounds.center + longAxis * longSize * 0.25f;
+        lookTarget.y = eyeHeight;
+        cameraObject.transform.position = cameraPosition;
+        cameraObject.transform.rotation = Quaternion.LookRotation((lookTarget - cameraPosition).normalized, Vector3.up);
+        Debug.Log("GAL FBX fallback camera bounds=" + bounds + " position=" + cameraPosition + " target=" + lookTarget);
+        return camera;
     }
 
-    private void CreateCabinCylinder(string objectName, Vector3 position, Vector3 scale, Quaternion rotation, Material material)
+    private static Bounds GetSceneBounds(GameObject importedScene)
     {
-        GameObject cylinder = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        cylinder.name = objectName;
-        cylinder.transform.SetParent(sceneRoot.transform, false);
-        cylinder.transform.localPosition = position;
-        cylinder.transform.localRotation = rotation;
-        cylinder.transform.localScale = scale;
-
-        Renderer renderer = cylinder.GetComponent<Renderer>();
-        if (renderer != null)
+        if (importedScene == null)
         {
-            renderer.sharedMaterial = material;
+            return new Bounds(Vector3.zero, new Vector3(3f, 2f, 7f));
         }
+
+        Renderer[] renderers = importedScene.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0)
+        {
+            return new Bounds(importedScene.transform.position, new Vector3(3f, 2f, 7f));
+        }
+
+        Bounds bounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            bounds.Encapsulate(renderers[i].bounds);
+        }
+
+        return bounds;
     }
 
-    private static void DisableImportedViewComponents(GameObject model)
+    private static int EnableImportedLights(GameObject importedScene)
     {
-        Camera[] importedCameras = model.GetComponentsInChildren<Camera>(true);
-        foreach (Camera importedCamera in importedCameras)
+        if (importedScene == null)
         {
-            importedCamera.enabled = false;
+            return 0;
         }
 
-        AudioListener[] audioListeners = model.GetComponentsInChildren<AudioListener>(true);
-        foreach (AudioListener listener in audioListeners)
+        Light[] lights = importedScene.GetComponentsInChildren<Light>(true);
+        foreach (Light light in lights)
         {
-            listener.enabled = false;
+            if (light == null)
+            {
+                continue;
+            }
+
+            light.gameObject.SetActive(true);
+            light.enabled = true;
         }
+
+        Debug.Log("GAL FBX imported lights enabled: " + lights.Length);
+        return lights.Length;
+    }
+
+    private static string GetHierarchyPath(Transform transform)
+    {
+        if (transform == null)
+        {
+            return string.Empty;
+        }
+
+        string path = transform.name;
+        Transform parent = transform.parent;
+        while (parent != null)
+        {
+            path = parent.name + "/" + path;
+            parent = parent.parent;
+        }
+
+        return path;
     }
 
     private void DisableOtherCameras()
