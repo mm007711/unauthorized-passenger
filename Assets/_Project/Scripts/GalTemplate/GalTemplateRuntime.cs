@@ -65,6 +65,7 @@ public class GalExplorePoint
     public float y = 0.5f;
     public float width = 170f;
     public float height = 48f;
+    public List<GalStoryCommand> commands = new List<GalStoryCommand>();
 }
 
 [Serializable]
@@ -107,6 +108,7 @@ public class GalStoryCommand
     public string facing;
     public string animation;
     public string path;
+    public float amount;
 }
 
 [Serializable]
@@ -354,6 +356,16 @@ public class GalTemplateRuntime : MonoBehaviour
     private void Update()
     {
         CheckHotReload();
+
+        if (GalFbxSceneController.IsSceneActive)
+        {
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                ExitFbxScene();
+            }
+
+            return;
+        }
 
         if (isSettingsOpen)
         {
@@ -896,6 +908,13 @@ public class GalTemplateRuntime : MonoBehaviour
                 case "animate_portrait":
                     AnimatePortrait(command);
                     break;
+                case "enter_fbx_scene":
+                case "load_fbx_scene":
+                    EnterFbxScene(command);
+                    return false;
+                case "exit_fbx_scene":
+                    ExitFbxScene();
+                    return false;
                 case "jump":
                 case "goto":
                     jumpNode = target;
@@ -1063,6 +1082,75 @@ public class GalTemplateRuntime : MonoBehaviour
         portraitController.PlayAnimation(FirstNonEmpty(command.slot, command.key), FirstNonEmpty(command.animation, command.value));
     }
 
+    private void EnterFbxScene(GalStoryCommand command)
+    {
+        string resourcePath = command == null ? null : FirstNonEmpty(command.path, command.value);
+        float pixelSize = command != null && command.amount > 0f ? command.amount : 7f;
+        GalFbxSceneController.Instance.Enter(resourcePath, pixelSize, HideGalForExternalScene);
+    }
+
+    private void ExitFbxScene()
+    {
+        GalFbxSceneController.Instance.Exit(ShowGalAfterExternalScene);
+    }
+
+    private void HideGalForExternalScene()
+    {
+        CancelAutoAdvance();
+        if (canvas != null)
+        {
+            canvas.enabled = false;
+        }
+
+        if (mainMenuRoot != null)
+        {
+            mainMenuRoot.SetActive(false);
+        }
+
+        if (hudRoot != null)
+        {
+            hudRoot.SetActive(false);
+        }
+
+        if (exploreRoot != null)
+        {
+            exploreRoot.SetActive(false);
+        }
+
+        if (dialogueRoot != null)
+        {
+            dialogueRoot.SetActive(false);
+        }
+
+        if (portraitController != null)
+        {
+            portraitController.HideAll();
+        }
+
+        CloseOverlayPages(true);
+    }
+
+    private void ShowGalAfterExternalScene()
+    {
+        if (canvas != null)
+        {
+            canvas.enabled = true;
+        }
+
+        if (!isInGame)
+        {
+            ShowMainMenu();
+            return;
+        }
+
+        if (hudRoot != null)
+        {
+            hudRoot.SetActive(true);
+        }
+
+        ShowExplore();
+    }
+
     private void ShowExplore()
     {
         FinishTypingForMenu();
@@ -1093,7 +1181,8 @@ public class GalTemplateRuntime : MonoBehaviour
 
         foreach (GalExplorePoint point in story.explorePoints)
         {
-            if (point == null || string.IsNullOrEmpty(point.displayName) || (string.IsNullOrEmpty(point.nodeId) && string.IsNullOrEmpty(point.background)))
+            bool hasCommand = point != null && point.commands != null && point.commands.Count > 0;
+            if (point == null || string.IsNullOrEmpty(point.displayName) || (string.IsNullOrEmpty(point.nodeId) && string.IsNullOrEmpty(point.background) && !hasCommand))
             {
                 continue;
             }
@@ -1152,6 +1241,22 @@ public class GalTemplateRuntime : MonoBehaviour
 
     private IEnumerator ChooseExplorePointRoutine(GalExplorePoint point)
     {
+        if (point.commands != null && point.commands.Count > 0)
+        {
+            if (!ExecuteCommands(point.commands, out string jumpNode))
+            {
+                yield break;
+            }
+
+            if (!string.IsNullOrEmpty(jumpNode))
+            {
+                isExploring = false;
+                exploreRoot.SetActive(false);
+                PlayNode(jumpNode);
+                yield break;
+            }
+        }
+
         string targetBackground = FirstNonEmpty(point.background, currentBackgroundId);
         if (string.IsNullOrEmpty(targetBackground))
         {

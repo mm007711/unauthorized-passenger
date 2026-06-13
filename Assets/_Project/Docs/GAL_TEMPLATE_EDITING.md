@@ -136,6 +136,29 @@ opening lines
 - `width` / `height`: button size on a 1920x1080 reference canvas.
 - `requiredFlag`: optional flag or item gate.
 
+Hotspots can run commands before moving or playing dialogue. For a black-screen transition into a runtime FBX scene:
+
+```json
+{
+  "id": "front_door",
+  "displayName": "出门",
+  "scene": "entry",
+  "x": 0.52,
+  "y": 0.52,
+  "width": 170,
+  "height": 46,
+  "commands": [
+    {
+      "command": "enter_fbx_scene",
+      "path": "FbxScenes/car",
+      "amount": 7
+    }
+  ]
+}
+```
+
+FBX scene assets live under `Assets/Resources/FbxScenes/`. The command `path` is the Resources path without file extension. `amount` controls the pixelated mosaic post effect, and Esc exits the FBX scene back to the GAL explore layer.
+
 ## Controls
 
 - Left click / Space: continue.

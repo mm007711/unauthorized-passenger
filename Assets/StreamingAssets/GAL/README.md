@@ -67,6 +67,20 @@ Use the in-game HUD `Portrait` button or the Settings page `Portrait Debug` butt
 
 Clicking a hotspot with a different target background uses a fade transition.
 
+Hotspots can also run commands before normal movement. The current exterior test uses:
+
+```json
+{
+  "command": "enter_fbx_scene",
+  "path": "FbxScenes/car",
+  "amount": 7
+}
+```
+
+- `path`: a Unity `Resources` path without extension. Put FBX prefabs under `Assets/Resources/FbxScenes/`.
+- `amount`: pixelation size for the runtime mosaic effect. Higher values look chunkier.
+- Esc exits the FBX scene and returns to the GAL explore layer.
+
 ## Runtime Controls
 
 - Left click / Space: continue.

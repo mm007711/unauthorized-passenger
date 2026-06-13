@@ -52,6 +52,11 @@
       "id": "entry",
       "displayName": "玄关",
       "path": "Backgrounds/entry_lineart.jpg"
+    },
+    {
+      "id": "bathroom",
+      "displayName": "卫生间",
+      "path": "Backgrounds/bathroom_lineart.jpg"
     }
   ],
   "explorePoints": [
@@ -122,14 +127,19 @@
     },
     {
       "id": "front_door",
-      "displayName": "大门",
+      "displayName": "出门",
       "scene": "entry",
-      "nodeId": "entry_001",
-      "background": "entry",
       "x": 0.52,
       "y": 0.52,
       "width": 170,
-      "height": 46
+      "height": 46,
+      "commands": [
+        {
+          "command": "enter_fbx_scene",
+          "path": "FbxScenes/car",
+          "amount": 7
+        }
+      ]
     },
     {
       "id": "entry_to_living",
@@ -138,6 +148,27 @@
       "background": "living_room",
       "x": 0.78,
       "y": 0.52,
+      "width": 170,
+      "height": 46
+    },
+    {
+      "id": "bathroom",
+      "displayName": "去卫生间",
+      "scene": "entry",
+      "background": "bathroom",
+      "x": 0.7,
+      "y": 0.48,
+      "width": 190,
+      "height": 46
+    },
+    {
+      "id": "mirror",
+      "displayName": "镜子",
+      "scene": "bathroom",
+      "nodeId": "mirror_001",
+      "background": "bathroom",
+      "x": 0.55,
+      "y": 0.61,
       "width": 170,
       "height": 46
     }
@@ -372,6 +403,22 @@
       "portraitExpression": "neutral",
       "portraitFacing": "auto",
       "portraitAnimation": "fade"
+    },
+    {
+      "id": "mirror_001",
+      "speaker": "测试角色",
+      "text": "中文测试占位文案 14：镜面只回给我一个模糊的轮廓。",
+      "background": "bathroom",
+      "commands": [
+        {
+          "command": "show_explore"
+        }
+      ],
+      "portraitSlot": "center",
+      "portraitCharacter": "test",
+      "portraitExpression": "surprised",
+      "portraitFacing": "auto",
+      "portraitAnimation": "shake"
     }
   ],
   "portraits": [
