@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,6 +15,7 @@ public class GalFbxSceneController : MonoBehaviour
     private Canvas overlayCanvas;
     private Image blackImage;
     private bool isActive;
+    private readonly List<Camera> disabledCameras = new List<Camera>();
 
     public static GalFbxSceneController Instance
     {
@@ -90,6 +92,7 @@ public class GalFbxSceneController : MonoBehaviour
     private void BuildScene(string resourcePath, float pixelSize)
     {
         DestroyScene();
+        DisableOtherCameras();
 
         sceneRoot = new GameObject("Runtime FBX Scene");
         DontDestroyOnLoad(sceneRoot);
@@ -99,20 +102,24 @@ public class GalFbxSceneController : MonoBehaviour
         if (prefab != null)
         {
             model = Instantiate(prefab, sceneRoot.transform);
+            Debug.Log("GAL FBX scene loaded: " + resourcePath);
         }
         else
         {
             model = GameObject.CreatePrimitive(PrimitiveType.Cube);
             model.transform.SetParent(sceneRoot.transform, false);
             model.name = "Missing FBX Placeholder";
+            Debug.LogWarning("GAL FBX scene missing Resources asset: " + resourcePath);
         }
 
+        Bounds sceneBounds = new Bounds(Vector3.zero, new Vector3(3f, 2f, 7f));
         if (model != null)
         {
             model.transform.position = Vector3.zero;
             model.transform.rotation = Quaternion.identity;
             model.transform.localScale = Vector3.one;
-            NormalizeModel(model);
+            DisableImportedViewComponents(model);
+            NormalizeModel(model, out sceneBounds);
         }
 
         GameObject cameraObject = new GameObject("Passenger View Camera");
@@ -121,10 +128,10 @@ public class GalFbxSceneController : MonoBehaviour
         sceneCamera.clearFlags = CameraClearFlags.SolidColor;
         sceneCamera.backgroundColor = new Color(0.02f, 0.025f, 0.04f, 1f);
         sceneCamera.fieldOfView = 50f;
+        sceneCamera.depth = 100f;
         sceneCamera.nearClipPlane = 0.03f;
         sceneCamera.farClipPlane = 250f;
-        cameraObject.transform.position = new Vector3(0f, 1.05f, -4.6f);
-        cameraObject.transform.rotation = Quaternion.Euler(7f, 0f, 0f);
+        ConfigurePassengerCamera(cameraObject.transform, sceneBounds);
 
         PixelateImageEffect pixelate = cameraObject.AddComponent<PixelateImageEffect>();
         pixelate.pixelSize = pixelSize;
@@ -134,15 +141,16 @@ public class GalFbxSceneController : MonoBehaviour
         RenderSettings.ambientLight = new Color(0.25f, 0.18f, 0.33f, 1f);
     }
 
-    private static void NormalizeModel(GameObject model)
+    private static void NormalizeModel(GameObject model, out Bounds bounds)
     {
         Renderer[] renderers = model.GetComponentsInChildren<Renderer>();
         if (renderers.Length == 0)
         {
+            bounds = new Bounds(Vector3.zero, new Vector3(3f, 2f, 7f));
             return;
         }
 
-        Bounds bounds = renderers[0].bounds;
+        bounds = renderers[0].bounds;
         for (int i = 1; i < renderers.Length; i++)
         {
             bounds.Encapsulate(renderers[i].bounds);
@@ -163,6 +171,81 @@ public class GalFbxSceneController : MonoBehaviour
 
         Vector3 offset = bounds.center;
         model.transform.position -= new Vector3(offset.x, bounds.min.y, offset.z);
+
+        bounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            bounds.Encapsulate(renderers[i].bounds);
+        }
+    }
+
+    private static void ConfigurePassengerCamera(Transform cameraTransform, Bounds bounds)
+    {
+        Vector3 size = bounds.size;
+        bool lengthIsX = size.x > size.z;
+        Vector3 longAxis = lengthIsX ? Vector3.right : Vector3.forward;
+        Vector3 sideAxis = lengthIsX ? Vector3.forward : Vector3.right;
+        float longSize = Mathf.Max(lengthIsX ? size.x : size.z, 2f);
+        float sideSize = Mathf.Max(lengthIsX ? size.z : size.x, 1f);
+        float eyeHeight = bounds.min.y + Mathf.Clamp(size.y * 0.48f, 0.85f, 2.2f);
+
+        Vector3 cameraPosition = bounds.center - longAxis * longSize * 0.43f - sideAxis * sideSize * 0.05f;
+        cameraPosition.y = eyeHeight;
+
+        Vector3 lookTarget = bounds.center + longAxis * longSize * 0.28f;
+        lookTarget.y = eyeHeight + Mathf.Clamp(size.y * 0.03f, 0.02f, 0.22f);
+
+        Vector3 direction = lookTarget - cameraPosition;
+        if (direction.sqrMagnitude < 0.001f)
+        {
+            direction = Vector3.forward;
+        }
+
+        cameraTransform.position = cameraPosition;
+        cameraTransform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+        Debug.Log("GAL FBX passenger camera bounds=" + bounds + " position=" + cameraPosition + " target=" + lookTarget);
+    }
+
+    private static void DisableImportedViewComponents(GameObject model)
+    {
+        Camera[] importedCameras = model.GetComponentsInChildren<Camera>(true);
+        foreach (Camera importedCamera in importedCameras)
+        {
+            importedCamera.enabled = false;
+        }
+
+        AudioListener[] audioListeners = model.GetComponentsInChildren<AudioListener>(true);
+        foreach (AudioListener listener in audioListeners)
+        {
+            listener.enabled = false;
+        }
+    }
+
+    private void DisableOtherCameras()
+    {
+        disabledCameras.Clear();
+        Camera[] cameras = Camera.allCameras;
+        foreach (Camera camera in cameras)
+        {
+            if (camera != null && camera.enabled)
+            {
+                camera.enabled = false;
+                disabledCameras.Add(camera);
+            }
+        }
+    }
+
+    private void RestoreOtherCameras()
+    {
+        foreach (Camera camera in disabledCameras)
+        {
+            if (camera != null)
+            {
+                camera.enabled = true;
+            }
+        }
+
+        disabledCameras.Clear();
     }
 
     private void AddLight(string lightName, Vector3 position, Color color, float intensity)
@@ -186,6 +269,7 @@ public class GalFbxSceneController : MonoBehaviour
         }
 
         sceneCamera = null;
+        RestoreOtherCameras();
     }
 
     private void EnsureBlackOverlay()

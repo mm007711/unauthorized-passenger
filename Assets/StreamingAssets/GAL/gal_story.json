@@ -162,6 +162,16 @@
       "height": 46
     },
     {
+      "id": "bathroom_to_entry",
+      "displayName": "返回玄关",
+      "scene": "bathroom",
+      "background": "entry",
+      "x": 0.18,
+      "y": 0.52,
+      "width": 190,
+      "height": 46
+    },
+    {
       "id": "mirror",
       "displayName": "镜子",
       "scene": "bathroom",

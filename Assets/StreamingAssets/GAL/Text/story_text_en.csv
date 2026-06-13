@@ -100,5 +100,6 @@ ui,ui.portrait_debug.play_animation,Portrait debug panel UI text.,,Play Animatio
 ui,ui.portrait_debug.hide_slot,Portrait debug panel UI text.,,Hide Slot,,,,,,,
 ui,ui.portrait_debug.hide_all,Portrait debug panel UI text.,,Hide All Portraits,,,,,,,
 explore,explore.bathroom,Explore hotspot button label.,,To Bathroom,,,,,,,
+explore,explore.bathroom_to_entry,Explore hotspot button label.,,Back to Entry,,,,,,,
 explore,explore.mirror,Explore hotspot button label.,,Mirror,,,,,,,
 story,node.mirror_001,Story node text and optional portrait cue.,Test Speaker,English placeholder line 14: the mirror returns only a blurred outline.,center,test,surprised,auto,shake,,
