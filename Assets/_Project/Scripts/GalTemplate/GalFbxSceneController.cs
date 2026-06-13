@@ -127,7 +127,7 @@ public class GalFbxSceneController : MonoBehaviour
             sceneCamera = CreateFallbackCamera(sceneBounds);
         }
 
-        if (sceneCamera != null)
+        if (sceneCamera != null && pixelSize > 1f)
         {
             PixelateImageEffect pixelate = sceneCamera.GetComponent<PixelateImageEffect>();
             if (pixelate == null)

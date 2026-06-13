@@ -137,7 +137,7 @@
         {
           "command": "enter_fbx_scene",
           "path": "FbxScenes/car",
-          "amount": 7
+          "amount": 0
         }
       ]
     },
