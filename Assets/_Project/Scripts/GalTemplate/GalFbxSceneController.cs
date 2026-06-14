@@ -17,6 +17,11 @@ public class GalFbxSceneController : MonoBehaviour
     private Quaternion sceneCameraBaseRotation;
     private Vector3 sceneCameraInputOffset;
     private Vector2 sceneCameraLookOffset;
+    private Vector2 sceneCameraMouseLookOffset;
+    private float sceneCameraBodyYaw;
+    private float sceneCameraMoveBlend;
+    private float sceneCameraTurnLean;
+    private float sceneCameraStepTime;
     private Canvas overlayCanvas;
     private Image blackImage;
     private bool isActive;
@@ -158,6 +163,11 @@ public class GalFbxSceneController : MonoBehaviour
             sceneCameraBaseRotation = sceneCameraTransform.rotation;
             sceneCameraInputOffset = Vector3.zero;
             sceneCameraLookOffset = Vector2.zero;
+            sceneCameraMouseLookOffset = Vector2.zero;
+            sceneCameraBodyYaw = 0f;
+            sceneCameraMoveBlend = 0f;
+            sceneCameraTurnLean = 0f;
+            sceneCameraStepTime = 0f;
             CabinMoodImageEffect mood = sceneCamera.GetComponent<CabinMoodImageEffect>();
             if (mood == null)
             {
@@ -187,65 +197,87 @@ public class GalFbxSceneController : MonoBehaviour
         UpdateCameraControlInput();
 
         float time = Time.unscaledTime;
+        float step = Mathf.Sin(sceneCameraStepTime);
+        float stepDouble = Mathf.Sin(sceneCameraStepTime * 2f);
         Vector3 sway = new Vector3(
             Mathf.Sin(time * 1.35f) * 0.018f,
             Mathf.Sin(time * 2.05f + 0.7f) * 0.012f,
             Mathf.Sin(time * 0.95f + 1.4f) * 0.014f);
+        Vector3 walkBob = new Vector3(
+            stepDouble * 0.012f,
+            Mathf.Abs(step) * 0.02f,
+            Mathf.Cos(sceneCameraStepTime) * 0.01f) * sceneCameraMoveBlend;
         Quaternion roll = Quaternion.Euler(
             Mathf.Sin(time * 1.2f + 0.4f) * 0.45f,
             Mathf.Sin(time * 0.85f) * 0.35f,
-            Mathf.Sin(time * 1.65f + 1.1f) * 0.65f);
-        Quaternion manualLook = Quaternion.Euler(sceneCameraLookOffset.y, sceneCameraLookOffset.x, 0f);
+            Mathf.Sin(time * 1.65f + 1.1f) * 0.65f - sceneCameraTurnLean);
+        Vector2 totalLook = sceneCameraLookOffset + sceneCameraMouseLookOffset;
+        Quaternion bodyTurn = Quaternion.Euler(0f, sceneCameraBodyYaw, 0f);
+        Quaternion manualLook = Quaternion.Euler(totalLook.y, totalLook.x, 0f);
 
-        sceneCameraTransform.position = sceneCameraBasePosition + sceneCameraBaseRotation * (sceneCameraInputOffset + sway);
-        sceneCameraTransform.rotation = sceneCameraBaseRotation * manualLook * roll;
+        sceneCameraTransform.position = sceneCameraBasePosition + sceneCameraBaseRotation * (sceneCameraInputOffset + sway + walkBob);
+        sceneCameraTransform.rotation = sceneCameraBaseRotation * bodyTurn * manualLook * roll;
     }
 
     private void UpdateCameraControlInput()
     {
-        float moveX = 0f;
-        float moveY = 0f;
-        float moveZ = 0f;
-        if (Input.GetKey(KeyCode.A))
-        {
-            moveX -= 1f;
-        }
-
-        if (Input.GetKey(KeyCode.D))
-        {
-            moveX += 1f;
-        }
-
+        float deltaTime = Time.unscaledDeltaTime;
+        float forwardInput = 0f;
         if (Input.GetKey(KeyCode.W))
         {
-            moveZ += 1f;
+            forwardInput += 1f;
         }
 
         if (Input.GetKey(KeyCode.S))
         {
-            moveZ -= 1f;
+            forwardInput -= 1f;
         }
 
+        float horizontalInput = 0f;
+        if (Input.GetKey(KeyCode.A))
+        {
+            horizontalInput -= 1f;
+        }
+
+        if (Input.GetKey(KeyCode.D))
+        {
+            horizontalInput += 1f;
+        }
+
+        bool sidestep = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        float turnInput = sidestep ? 0f : horizontalInput;
+        float strafeInput = sidestep ? horizontalInput : 0f;
+
+        sceneCameraBodyYaw += turnInput * (34f * deltaTime);
+        sceneCameraBodyYaw = Mathf.Clamp(sceneCameraBodyYaw, -24f, 24f);
+        sceneCameraTurnLean = Mathf.Lerp(sceneCameraTurnLean, turnInput * 1.4f, GetDampedInterpolation(8f));
+
+        Quaternion movementYaw = Quaternion.Euler(0f, sceneCameraBodyYaw, 0f);
+        Vector3 moveInput = movementYaw * new Vector3(strafeInput * 0.42f, 0f, forwardInput);
         if (Input.GetKey(KeyCode.Q))
         {
-            moveY -= 1f;
+            moveInput.y -= 0.45f;
         }
 
         if (Input.GetKey(KeyCode.E))
         {
-            moveY += 1f;
+            moveInput.y += 0.45f;
         }
 
-        Vector3 moveInput = new Vector3(moveX, moveY, moveZ);
         if (moveInput.sqrMagnitude > 1f)
         {
             moveInput.Normalize();
         }
 
-        sceneCameraInputOffset += moveInput * (0.45f * Time.unscaledDeltaTime);
-        sceneCameraInputOffset.x = Mathf.Clamp(sceneCameraInputOffset.x, -0.32f, 0.32f);
+        sceneCameraInputOffset += moveInput * (0.62f * deltaTime);
+        sceneCameraInputOffset.x = Mathf.Clamp(sceneCameraInputOffset.x, -0.42f, 0.42f);
         sceneCameraInputOffset.y = Mathf.Clamp(sceneCameraInputOffset.y, -0.16f, 0.18f);
-        sceneCameraInputOffset.z = Mathf.Clamp(sceneCameraInputOffset.z, -0.42f, 0.42f);
+        sceneCameraInputOffset.z = Mathf.Clamp(sceneCameraInputOffset.z, -0.72f, 0.72f);
+
+        float moveAmount = Mathf.Clamp01(Mathf.Abs(forwardInput) + Mathf.Abs(strafeInput) * 0.7f);
+        sceneCameraMoveBlend = Mathf.Lerp(sceneCameraMoveBlend, moveAmount, GetDampedInterpolation(6f));
+        sceneCameraStepTime += deltaTime * Mathf.Lerp(2.2f, 7.4f, sceneCameraMoveBlend);
+        sceneCameraMouseLookOffset = Vector2.Lerp(sceneCameraMouseLookOffset, GetMouseLookTarget(), GetDampedInterpolation(5.5f));
 
         float lookX = 0f;
         float lookY = 0f;
@@ -271,19 +303,54 @@ public class GalFbxSceneController : MonoBehaviour
 
         if (Input.GetMouseButton(1))
         {
-            lookX += Input.GetAxisRaw("Mouse X") * 0.8f;
-            lookY -= Input.GetAxisRaw("Mouse Y") * 0.8f;
+            lookX += Input.GetAxisRaw("Mouse X") * 5.5f;
+            lookY -= Input.GetAxisRaw("Mouse Y") * 4f;
         }
 
-        sceneCameraLookOffset += new Vector2(lookX, lookY) * (32f * Time.unscaledDeltaTime);
-        sceneCameraLookOffset.x = Mathf.Clamp(sceneCameraLookOffset.x, -8f, 8f);
-        sceneCameraLookOffset.y = Mathf.Clamp(sceneCameraLookOffset.y, -5f, 5f);
+        Vector2 manualLookInput = new Vector2(lookX, lookY);
+        if (manualLookInput.sqrMagnitude > 0.001f)
+        {
+            sceneCameraLookOffset += manualLookInput * (38f * deltaTime);
+        }
+        else
+        {
+            sceneCameraLookOffset = Vector2.Lerp(sceneCameraLookOffset, Vector2.zero, GetDampedInterpolation(1.8f));
+        }
+
+        sceneCameraLookOffset.x = Mathf.Clamp(sceneCameraLookOffset.x, -12f, 12f);
+        sceneCameraLookOffset.y = Mathf.Clamp(sceneCameraLookOffset.y, -7f, 7f);
 
         if (Input.GetKeyDown(KeyCode.R))
         {
             sceneCameraInputOffset = Vector3.zero;
             sceneCameraLookOffset = Vector2.zero;
+            sceneCameraMouseLookOffset = Vector2.zero;
+            sceneCameraBodyYaw = 0f;
+            sceneCameraMoveBlend = 0f;
+            sceneCameraTurnLean = 0f;
+            sceneCameraStepTime = 0f;
         }
+    }
+
+    private static Vector2 GetMouseLookTarget()
+    {
+        Vector3 mousePosition = Input.mousePosition;
+        if (mousePosition.x < 0f || mousePosition.y < 0f || mousePosition.x > Screen.width || mousePosition.y > Screen.height)
+        {
+            return Vector2.zero;
+        }
+
+        float normalizedX = Mathf.Clamp((mousePosition.x / Mathf.Max(1f, Screen.width) - 0.5f) * 2f, -1f, 1f);
+        float normalizedY = Mathf.Clamp((mousePosition.y / Mathf.Max(1f, Screen.height) - 0.5f) * 2f, -1f, 1f);
+        normalizedX = Mathf.Sign(normalizedX) * Mathf.Pow(Mathf.Abs(normalizedX), 1.35f);
+        normalizedY = Mathf.Sign(normalizedY) * Mathf.Pow(Mathf.Abs(normalizedY), 1.35f);
+
+        return new Vector2(normalizedX * 7.5f, -normalizedY * 4.5f);
+    }
+
+    private static float GetDampedInterpolation(float speed)
+    {
+        return 1f - Mathf.Exp(-speed * Time.unscaledDeltaTime);
     }
 
     private static Camera SelectImportedCamera(GameObject importedScene)
