@@ -10,11 +10,25 @@ public class GalFbxSceneController : MonoBehaviour
     private const float DefaultCameraHeightOffset = 0.18f;
     private const float MinCameraHeightOffset = -0.4f;
     private const float MaxCameraHeightOffset = 0.6f;
+    private const float DefaultMoodIntensity = 0.75f;
+
+    private static readonly Color ClearAmbientLight = new Color(0.42f, 0.42f, 0.46f, 1f);
+    private static readonly Color EerieAmbientLight = new Color(0.16f, 0.12f, 0.24f, 1f);
 
     private static GalFbxSceneController instance;
 
+    private class MoodLightBinding
+    {
+        public Light light;
+        public Color clearColor;
+        public Color eerieColor;
+        public float clearIntensity;
+        public float eerieIntensity;
+    }
+
     private GameObject sceneRoot;
     private Camera sceneCamera;
+    private CabinMoodImageEffect sceneMoodEffect;
     private Transform sceneCameraTransform;
     private Vector3 sceneCameraBasePosition;
     private Quaternion sceneCameraBaseRotation;
@@ -26,11 +40,13 @@ public class GalFbxSceneController : MonoBehaviour
     private float sceneCameraTurnLean;
     private float sceneCameraStepTime;
     private float cameraHeightOffset = DefaultCameraHeightOffset;
+    private float moodIntensity = DefaultMoodIntensity;
     private Canvas overlayCanvas;
     private Image blackImage;
     private bool isActive;
     private bool controlsEnabled = true;
     private readonly List<Camera> disabledCameras = new List<Camera>();
+    private readonly List<MoodLightBinding> moodLights = new List<MoodLightBinding>();
 
     public static GalFbxSceneController Instance
     {
@@ -65,6 +81,12 @@ public class GalFbxSceneController : MonoBehaviour
     public void SetCameraHeightOffset(float offset)
     {
         cameraHeightOffset = Mathf.Clamp(offset, MinCameraHeightOffset, MaxCameraHeightOffset);
+    }
+
+    public void SetMoodIntensity(float intensity)
+    {
+        moodIntensity = Mathf.Clamp01(intensity);
+        ApplyMoodSettings();
     }
 
     public void Enter(string resourcePath, float pixelSize, Action onBlackout = null)
@@ -164,13 +186,12 @@ public class GalFbxSceneController : MonoBehaviour
             sceneCameraMoveBlend = 0f;
             sceneCameraTurnLean = 0f;
             sceneCameraStepTime = 0f;
-            CabinMoodImageEffect mood = sceneCamera.GetComponent<CabinMoodImageEffect>();
-            if (mood == null)
+            sceneMoodEffect = sceneCamera.GetComponent<CabinMoodImageEffect>();
+            if (sceneMoodEffect == null)
             {
-                mood = sceneCamera.gameObject.AddComponent<CabinMoodImageEffect>();
+                sceneMoodEffect = sceneCamera.gameObject.AddComponent<CabinMoodImageEffect>();
             }
 
-            mood.intensity = 0.9f;
             ApplyPixelateEffect(sceneCamera, pixelSize);
         }
 
@@ -180,6 +201,8 @@ public class GalFbxSceneController : MonoBehaviour
         {
             AddFallbackLights(sceneBounds);
         }
+
+        ApplyMoodSettings();
     }
 
     private void ApplyPixelateEffect(Camera camera, float pixelSize)
@@ -678,11 +701,9 @@ public class GalFbxSceneController : MonoBehaviour
         float lightY = bounds.min.y + Mathf.Max(1.4f, bounds.size.y * 0.72f);
         float forward = Mathf.Max(bounds.size.x, bounds.size.z) * 0.24f;
 
-        AddLight("Reference Pink Aisle Wash", new Vector3(center.x - 0.35f, lightY, center.z - forward), new Color(1f, 0.38f, 0.9f, 1f), 1.35f);
-        AddLight("Reference Violet Forward Glow", new Vector3(center.x + 0.2f, Mathf.Lerp(bounds.min.y, lightY, 0.82f), center.z + forward), new Color(0.62f, 0.45f, 1f, 1f), 1.1f);
-        AddLight("Reference Cool Window Fill", new Vector3(center.x + bounds.extents.x * 0.78f, Mathf.Lerp(bounds.min.y, lightY, 0.72f), center.z), new Color(0.28f, 0.45f, 0.72f, 1f), 0.75f);
-
-        RenderSettings.ambientLight = new Color(0.16f, 0.12f, 0.24f, 1f);
+        AddMoodLight("Reference Pink Aisle Wash", new Vector3(center.x - 0.35f, lightY, center.z - forward), new Color(0.95f, 0.9f, 1f, 1f), new Color(1f, 0.38f, 0.9f, 1f), 0.25f, 1.35f);
+        AddMoodLight("Reference Violet Forward Glow", new Vector3(center.x + 0.2f, Mathf.Lerp(bounds.min.y, lightY, 0.82f), center.z + forward), new Color(0.82f, 0.9f, 1f, 1f), new Color(0.62f, 0.45f, 1f, 1f), 0.22f, 1.1f);
+        AddMoodLight("Reference Cool Window Fill", new Vector3(center.x + bounds.extents.x * 0.78f, Mathf.Lerp(bounds.min.y, lightY, 0.72f), center.z), new Color(0.86f, 0.92f, 1f, 1f), new Color(0.28f, 0.45f, 0.72f, 1f), 0.35f, 0.75f);
     }
 
     private void AddFallbackLights(Bounds bounds)
@@ -697,9 +718,8 @@ public class GalFbxSceneController : MonoBehaviour
         Vector3 fillPosition = center + sideAxis * Mathf.Max(1.2f, bounds.extents.x * 0.55f);
         fillPosition.y = Mathf.Lerp(bounds.min.y, lightY, 0.8f);
 
-        AddLight("FBX Fallback Key Light", keyPosition, new Color(0.95f, 0.82f, 1f, 1f), 1.4f);
-        AddLight("FBX Fallback Fill Light", fillPosition, new Color(0.45f, 0.65f, 1f, 1f), 0.85f);
-        RenderSettings.ambientLight = new Color(0.22f, 0.2f, 0.28f, 1f);
+        AddMoodLight("FBX Fallback Key Light", keyPosition, new Color(1f, 0.96f, 0.9f, 1f), new Color(0.95f, 0.82f, 1f, 1f), 0.75f, 1.4f);
+        AddMoodLight("FBX Fallback Fill Light", fillPosition, new Color(0.9f, 0.96f, 1f, 1f), new Color(0.45f, 0.65f, 1f, 1f), 0.45f, 0.85f);
     }
 
     private static string GetHierarchyPath(Transform transform)
@@ -759,6 +779,52 @@ public class GalFbxSceneController : MonoBehaviour
         light.range = 8f;
     }
 
+    private void AddMoodLight(string lightName, Vector3 position, Color clearColor, Color eerieColor, float clearIntensity, float eerieIntensity)
+    {
+        GameObject lightObject = new GameObject(lightName);
+        lightObject.transform.SetParent(sceneRoot.transform, false);
+        lightObject.transform.position = position;
+        Light light = lightObject.AddComponent<Light>();
+        light.type = LightType.Point;
+        light.range = 8f;
+
+        moodLights.Add(new MoodLightBinding
+        {
+            light = light,
+            clearColor = clearColor,
+            eerieColor = eerieColor,
+            clearIntensity = clearIntensity,
+            eerieIntensity = eerieIntensity
+        });
+    }
+
+    private void ApplyMoodSettings()
+    {
+        float strength = Mathf.Clamp01(moodIntensity);
+        if (sceneRoot == null)
+        {
+            return;
+        }
+
+        if (sceneMoodEffect != null)
+        {
+            sceneMoodEffect.intensity = strength;
+        }
+
+        RenderSettings.ambientLight = Color.Lerp(ClearAmbientLight, EerieAmbientLight, strength);
+        for (int i = 0; i < moodLights.Count; i++)
+        {
+            MoodLightBinding binding = moodLights[i];
+            if (binding == null || binding.light == null)
+            {
+                continue;
+            }
+
+            binding.light.color = Color.Lerp(binding.clearColor, binding.eerieColor, strength);
+            binding.light.intensity = Mathf.Lerp(binding.clearIntensity, binding.eerieIntensity, strength);
+        }
+    }
+
     private void DestroyScene()
     {
         if (sceneRoot != null)
@@ -768,7 +834,9 @@ public class GalFbxSceneController : MonoBehaviour
         }
 
         sceneCamera = null;
+        sceneMoodEffect = null;
         sceneCameraTransform = null;
+        moodLights.Clear();
         RestoreOtherCameras();
     }
 

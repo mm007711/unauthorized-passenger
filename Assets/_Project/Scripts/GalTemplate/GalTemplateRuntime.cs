@@ -131,6 +131,7 @@ public class GalTemplateSettings
     public float autoDelay = 1.2f;
     public float masterVolume = 0.8f;
     public float fbxCameraHeight = 0.18f;
+    public float cabinMoodIntensity = 0.75f;
     public bool fullscreen = true;
     public bool skipUnreadText;
     public string language = "zh-CN";
@@ -289,11 +290,13 @@ public class GalTemplateRuntime : MonoBehaviour
     private Text autoDelayValueText;
     private Text volumeValueText;
     private Text fbxCameraHeightValueText;
+    private Text cabinMoodValueText;
     private Text languageValueText;
     private Text settingsTextSpeedLabel;
     private Text settingsAutoDelayLabel;
     private Text settingsVolumeLabel;
     private Text settingsFbxCameraHeightLabel;
+    private Text settingsCabinMoodLabel;
     private Text settingsFullscreenLabel;
     private Text settingsSkipUnreadLabel;
     private Text settingsSavePanelButtonLabel;
@@ -310,6 +313,7 @@ public class GalTemplateRuntime : MonoBehaviour
     private Slider autoDelaySlider;
     private Slider volumeSlider;
     private Slider fbxCameraHeightSlider;
+    private Slider cabinMoodSlider;
     private GameObject portraitDebugRoot;
     private Text portraitDebugTitleText;
     private Text portraitDebugSlotLabel;
@@ -2252,6 +2256,7 @@ public class GalTemplateRuntime : MonoBehaviour
         SetText(settingsAutoDelayLabel, T("ui.settings.auto_delay", "自动间隔"));
         SetText(settingsVolumeLabel, T("ui.settings.volume", "主音量"));
         SetText(settingsFbxCameraHeightLabel, T("ui.settings.camera_height", "摄像头高度"));
+        SetText(settingsCabinMoodLabel, T("ui.settings.cabin_mood", "氛围强度"));
         SetText(settingsFullscreenLabel, T("ui.settings.fullscreen", "全屏显示"));
         SetText(settingsSkipUnreadLabel, T("ui.settings.skip_unread", "允许跳过未读文本"));
         SetText(languageValueText, GetLanguageButtonText());
@@ -3098,6 +3103,15 @@ public class GalTemplateRuntime : MonoBehaviour
             SaveSettings();
         });
 
+        cabinMoodSlider = CreateSettingsSlider(panel.transform, T("ui.settings.cabin_mood", "氛围强度"), new Vector2(240f, -480f), 0f, 1f, settings.cabinMoodIntensity, false, out settingsCabinMoodLabel, out cabinMoodValueText);
+        cabinMoodSlider.onValueChanged.AddListener(delegate(float value)
+        {
+            settings.cabinMoodIntensity = value;
+            cabinMoodValueText.text = FormatPercent(value);
+            ApplySettings();
+            SaveSettings();
+        });
+
         fullscreenToggle = CreateSettingsToggle(panel.transform, T("ui.settings.fullscreen", "全屏显示"), new Vector2(570f, -142f), settings.fullscreen, out settingsFullscreenLabel);
         fullscreenToggle.onValueChanged.AddListener(delegate(bool value)
         {
@@ -3114,12 +3128,12 @@ public class GalTemplateRuntime : MonoBehaviour
         });
 
         Button languageButton = CreateSettingsButton(panel.transform, GetLanguageButtonText(), new Vector2(655f, -275f), new Vector2(340f, 54f), CycleLanguage, out languageValueText);
-        settingsSavePanelButton = CreateSettingsButton(panel.transform, T("ui.settings.open_save", "打开存档"), new Vector2(575f, -350f), new Vector2(160f, 50f), ShowSavePanelFromSettings, out settingsSavePanelButtonLabel);
-        Button loadPanelButton = CreateSettingsButton(panel.transform, T("ui.settings.open_load", "打开读档"), new Vector2(750f, -350f), new Vector2(160f, 50f), ShowLoadPanelFromSettings, out settingsLoadPanelButtonLabel);
-        Button historyButton = CreateSettingsButton(panel.transform, T("ui.settings.open_history", "查看历史"), new Vector2(575f, -410f), new Vector2(160f, 50f), ShowHistoryFromSettings, out settingsHistoryButtonLabel);
-        Button reloadTextButton = CreateSettingsButton(panel.transform, T("ui.settings.reload_text", "重载文案"), new Vector2(750f, -410f), new Vector2(160f, 50f), ReloadStoryFilesInPlace, out settingsReloadButtonLabel);
-        Button deleteButton = CreateSettingsButton(panel.transform, T("ui.settings.delete_save", "删除存档"), new Vector2(575f, -470f), new Vector2(160f, 50f), DeleteSave, out settingsDeleteButtonLabel);
-        Button debugButton = CreateSettingsButton(panel.transform, T("ui.settings.portrait_debug", "立绘调试"), new Vector2(750f, -470f), new Vector2(160f, 50f), ShowPortraitDebugFromSettings, out settingsDebugButtonLabel);
+        settingsSavePanelButton = CreateSettingsButton(panel.transform, T("ui.settings.open_save", "打开存档"), new Vector2(575f, -340f), new Vector2(160f, 50f), ShowSavePanelFromSettings, out settingsSavePanelButtonLabel);
+        Button loadPanelButton = CreateSettingsButton(panel.transform, T("ui.settings.open_load", "打开读档"), new Vector2(750f, -340f), new Vector2(160f, 50f), ShowLoadPanelFromSettings, out settingsLoadPanelButtonLabel);
+        Button historyButton = CreateSettingsButton(panel.transform, T("ui.settings.open_history", "查看历史"), new Vector2(575f, -400f), new Vector2(160f, 50f), ShowHistoryFromSettings, out settingsHistoryButtonLabel);
+        Button reloadTextButton = CreateSettingsButton(panel.transform, T("ui.settings.reload_text", "重载文案"), new Vector2(750f, -400f), new Vector2(160f, 50f), ReloadStoryFilesInPlace, out settingsReloadButtonLabel);
+        Button deleteButton = CreateSettingsButton(panel.transform, T("ui.settings.delete_save", "删除存档"), new Vector2(575f, -460f), new Vector2(160f, 50f), DeleteSave, out settingsDeleteButtonLabel);
+        Button debugButton = CreateSettingsButton(panel.transform, T("ui.settings.portrait_debug", "立绘调试"), new Vector2(750f, -460f), new Vector2(160f, 50f), ShowPortraitDebugFromSettings, out settingsDebugButtonLabel);
 
         Button closeButton = CreateButton(panel.transform, T("ui.common.exit", "退出"), ExitOverlayPages, out settingsExitButtonLabel);
         RectTransform closeRect = closeButton.GetComponent<RectTransform>();
@@ -3252,12 +3266,14 @@ public class GalTemplateRuntime : MonoBehaviour
         autoDelaySlider.SetValueWithoutNotify(settings.autoDelay);
         volumeSlider.SetValueWithoutNotify(settings.masterVolume);
         fbxCameraHeightSlider.SetValueWithoutNotify(settings.fbxCameraHeight);
+        cabinMoodSlider.SetValueWithoutNotify(settings.cabinMoodIntensity);
         fullscreenToggle.SetIsOnWithoutNotify(settings.fullscreen);
         skipUnreadToggle.SetIsOnWithoutNotify(settings.skipUnreadText);
         textSpeedValueText.text = settings.textSpeed.ToString("0");
         autoDelayValueText.text = settings.autoDelay.ToString("0.0") + "s";
         volumeValueText.text = Mathf.RoundToInt(settings.masterVolume * 100f) + "%";
         fbxCameraHeightValueText.text = FormatCameraHeight(settings.fbxCameraHeight);
+        cabinMoodValueText.text = FormatPercent(settings.cabinMoodIntensity);
         languageValueText.text = GetLanguageButtonText();
         settingsSavePanelButton.interactable = isInGame;
         RefreshOverlayNavigationButtons();
@@ -3514,6 +3530,7 @@ public class GalTemplateRuntime : MonoBehaviour
         settings.autoDelay = PlayerPrefs.GetFloat("GalTemplate.AutoDelay", settings.autoDelay);
         settings.masterVolume = PlayerPrefs.GetFloat("GalTemplate.MasterVolume", settings.masterVolume);
         settings.fbxCameraHeight = PlayerPrefs.GetFloat("GalTemplate.FbxCameraHeight", settings.fbxCameraHeight);
+        settings.cabinMoodIntensity = PlayerPrefs.GetFloat("GalTemplate.CabinMoodIntensity", settings.cabinMoodIntensity);
         settings.fullscreen = PlayerPrefs.GetInt("GalTemplate.Fullscreen", settings.fullscreen ? 1 : 0) == 1;
         settings.skipUnreadText = PlayerPrefs.GetInt("GalTemplate.SkipUnreadText", settings.skipUnreadText ? 1 : 0) == 1;
         settings.language = PlayerPrefs.GetString("GalTemplate.Language", settings.language);
@@ -3526,6 +3543,7 @@ public class GalTemplateRuntime : MonoBehaviour
         PlayerPrefs.SetFloat("GalTemplate.AutoDelay", settings.autoDelay);
         PlayerPrefs.SetFloat("GalTemplate.MasterVolume", settings.masterVolume);
         PlayerPrefs.SetFloat("GalTemplate.FbxCameraHeight", settings.fbxCameraHeight);
+        PlayerPrefs.SetFloat("GalTemplate.CabinMoodIntensity", settings.cabinMoodIntensity);
         PlayerPrefs.SetInt("GalTemplate.Fullscreen", settings.fullscreen ? 1 : 0);
         PlayerPrefs.SetInt("GalTemplate.SkipUnreadText", settings.skipUnreadText ? 1 : 0);
         PlayerPrefs.SetString("GalTemplate.Language", settings.language);
@@ -3538,11 +3556,17 @@ public class GalTemplateRuntime : MonoBehaviour
         AudioListener.volume = Mathf.Clamp01(settings.masterVolume);
         Screen.fullScreen = settings.fullscreen;
         GalFbxSceneController.Instance.SetCameraHeightOffset(settings.fbxCameraHeight);
+        GalFbxSceneController.Instance.SetMoodIntensity(settings.cabinMoodIntensity);
     }
 
     private static string FormatCameraHeight(float value)
     {
         return (value >= 0f ? "+" : string.Empty) + value.ToString("0.00") + "m";
+    }
+
+    private static string FormatPercent(float value)
+    {
+        return Mathf.RoundToInt(Mathf.Clamp01(value) * 100f) + "%";
     }
 
     private void ShowToast(string message)
