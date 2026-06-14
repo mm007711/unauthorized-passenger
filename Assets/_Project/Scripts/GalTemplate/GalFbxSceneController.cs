@@ -12,6 +12,11 @@ public class GalFbxSceneController : MonoBehaviour
 
     private GameObject sceneRoot;
     private Camera sceneCamera;
+    private Transform sceneCameraTransform;
+    private Vector3 sceneCameraBasePosition;
+    private Quaternion sceneCameraBaseRotation;
+    private Vector3 sceneCameraInputOffset;
+    private Vector2 sceneCameraLookOffset;
     private Canvas overlayCanvas;
     private Image blackImage;
     private bool isActive;
@@ -49,7 +54,7 @@ public class GalFbxSceneController : MonoBehaviour
             return;
         }
 
-        StartCoroutine(EnterRoutine(string.IsNullOrEmpty(resourcePath) ? DefaultResourcePath : resourcePath, pixelSize <= 0f ? 7f : pixelSize, onBlackout));
+        StartCoroutine(EnterRoutine(string.IsNullOrEmpty(resourcePath) ? DefaultResourcePath : resourcePath, Mathf.Max(0f, pixelSize), onBlackout));
     }
 
     public void Exit(Action onBlackout = null)
@@ -137,12 +142,140 @@ public class GalFbxSceneController : MonoBehaviour
 
             pixelate.pixelSize = pixelSize;
         }
+        else if (sceneCamera != null)
+        {
+            PixelateImageEffect pixelate = sceneCamera.GetComponent<PixelateImageEffect>();
+            if (pixelate != null)
+            {
+                Destroy(pixelate);
+            }
+        }
+
+        if (sceneCamera != null)
+        {
+            sceneCameraTransform = sceneCamera.transform;
+            sceneCameraBasePosition = sceneCameraTransform.position;
+            sceneCameraBaseRotation = sceneCameraTransform.rotation;
+            sceneCameraInputOffset = Vector3.zero;
+            sceneCameraLookOffset = Vector2.zero;
+        }
+
+        AddReferenceMoodLights(importedScene);
 
         if (lightCount == 0)
         {
             AddLight("FBX Fallback Key Light", new Vector3(0f, 3.2f, -2.2f), new Color(0.95f, 0.82f, 1f, 1f), 1.4f);
             AddLight("FBX Fallback Fill Light", new Vector3(2f, 1.8f, 1.8f), new Color(0.45f, 0.65f, 1f, 1f), 0.85f);
             RenderSettings.ambientLight = new Color(0.22f, 0.2f, 0.28f, 1f);
+        }
+    }
+
+    private void LateUpdate()
+    {
+        if (!isActive || sceneCameraTransform == null)
+        {
+            return;
+        }
+
+        UpdateCameraControlInput();
+
+        float time = Time.unscaledTime;
+        Vector3 sway = new Vector3(
+            Mathf.Sin(time * 1.35f) * 0.018f,
+            Mathf.Sin(time * 2.05f + 0.7f) * 0.012f,
+            Mathf.Sin(time * 0.95f + 1.4f) * 0.014f);
+        Quaternion roll = Quaternion.Euler(
+            Mathf.Sin(time * 1.2f + 0.4f) * 0.45f,
+            Mathf.Sin(time * 0.85f) * 0.35f,
+            Mathf.Sin(time * 1.65f + 1.1f) * 0.65f);
+        Quaternion manualLook = Quaternion.Euler(sceneCameraLookOffset.y, sceneCameraLookOffset.x, 0f);
+
+        sceneCameraTransform.position = sceneCameraBasePosition + sceneCameraBaseRotation * (sceneCameraInputOffset + sway);
+        sceneCameraTransform.rotation = sceneCameraBaseRotation * manualLook * roll;
+    }
+
+    private void UpdateCameraControlInput()
+    {
+        float moveX = 0f;
+        float moveY = 0f;
+        float moveZ = 0f;
+        if (Input.GetKey(KeyCode.A))
+        {
+            moveX -= 1f;
+        }
+
+        if (Input.GetKey(KeyCode.D))
+        {
+            moveX += 1f;
+        }
+
+        if (Input.GetKey(KeyCode.W))
+        {
+            moveZ += 1f;
+        }
+
+        if (Input.GetKey(KeyCode.S))
+        {
+            moveZ -= 1f;
+        }
+
+        if (Input.GetKey(KeyCode.Q))
+        {
+            moveY -= 1f;
+        }
+
+        if (Input.GetKey(KeyCode.E))
+        {
+            moveY += 1f;
+        }
+
+        Vector3 moveInput = new Vector3(moveX, moveY, moveZ);
+        if (moveInput.sqrMagnitude > 1f)
+        {
+            moveInput.Normalize();
+        }
+
+        sceneCameraInputOffset += moveInput * (0.45f * Time.unscaledDeltaTime);
+        sceneCameraInputOffset.x = Mathf.Clamp(sceneCameraInputOffset.x, -0.32f, 0.32f);
+        sceneCameraInputOffset.y = Mathf.Clamp(sceneCameraInputOffset.y, -0.16f, 0.18f);
+        sceneCameraInputOffset.z = Mathf.Clamp(sceneCameraInputOffset.z, -0.42f, 0.42f);
+
+        float lookX = 0f;
+        float lookY = 0f;
+        if (Input.GetKey(KeyCode.LeftArrow))
+        {
+            lookX -= 1f;
+        }
+
+        if (Input.GetKey(KeyCode.RightArrow))
+        {
+            lookX += 1f;
+        }
+
+        if (Input.GetKey(KeyCode.UpArrow))
+        {
+            lookY -= 1f;
+        }
+
+        if (Input.GetKey(KeyCode.DownArrow))
+        {
+            lookY += 1f;
+        }
+
+        if (Input.GetMouseButton(1))
+        {
+            lookX += Input.GetAxisRaw("Mouse X") * 0.8f;
+            lookY -= Input.GetAxisRaw("Mouse Y") * 0.8f;
+        }
+
+        sceneCameraLookOffset += new Vector2(lookX, lookY) * (32f * Time.unscaledDeltaTime);
+        sceneCameraLookOffset.x = Mathf.Clamp(sceneCameraLookOffset.x, -8f, 8f);
+        sceneCameraLookOffset.y = Mathf.Clamp(sceneCameraLookOffset.y, -5f, 5f);
+
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            sceneCameraInputOffset = Vector3.zero;
+            sceneCameraLookOffset = Vector2.zero;
         }
     }
 
@@ -274,6 +407,20 @@ public class GalFbxSceneController : MonoBehaviour
         return lights.Length;
     }
 
+    private void AddReferenceMoodLights(GameObject importedScene)
+    {
+        Bounds bounds = GetSceneBounds(importedScene);
+        Vector3 center = bounds.center;
+        float height = bounds.min.y + Mathf.Max(1.4f, bounds.size.y * 0.72f);
+        float forward = Mathf.Max(bounds.size.x, bounds.size.z) * 0.24f;
+
+        AddLight("Reference Pink Aisle Wash", center + new Vector3(-0.35f, height, -forward), new Color(1f, 0.38f, 0.9f, 1f), 1.35f);
+        AddLight("Reference Violet Forward Glow", center + new Vector3(0.2f, height * 0.82f, forward), new Color(0.62f, 0.45f, 1f, 1f), 1.1f);
+        AddLight("Reference Cool Window Fill", center + new Vector3(bounds.extents.x * 0.78f, height * 0.72f, 0f), new Color(0.28f, 0.45f, 0.72f, 1f), 0.75f);
+
+        RenderSettings.ambientLight = new Color(0.16f, 0.12f, 0.24f, 1f);
+    }
+
     private static string GetHierarchyPath(Transform transform)
     {
         if (transform == null)
@@ -340,6 +487,7 @@ public class GalFbxSceneController : MonoBehaviour
         }
 
         sceneCamera = null;
+        sceneCameraTransform = null;
         RestoreOtherCameras();
     }
 

@@ -1085,7 +1085,7 @@ public class GalTemplateRuntime : MonoBehaviour
     private void EnterFbxScene(GalStoryCommand command)
     {
         string resourcePath = command == null ? null : FirstNonEmpty(command.path, command.value);
-        float pixelSize = command != null && command.amount > 0f ? command.amount : 7f;
+        float pixelSize = command != null ? command.amount : 0f;
         GalFbxSceneController.Instance.Enter(resourcePath, pixelSize, HideGalForExternalScene);
     }
 
