@@ -130,6 +130,7 @@ public class GalTemplateSettings
     public float textSpeed = 42f;
     public float autoDelay = 1.2f;
     public float masterVolume = 0.8f;
+    public float fbxCameraHeight = 0.18f;
     public bool fullscreen = true;
     public bool skipUnreadText;
     public string language = "zh-CN";
@@ -287,10 +288,12 @@ public class GalTemplateRuntime : MonoBehaviour
     private Text textSpeedValueText;
     private Text autoDelayValueText;
     private Text volumeValueText;
+    private Text fbxCameraHeightValueText;
     private Text languageValueText;
     private Text settingsTextSpeedLabel;
     private Text settingsAutoDelayLabel;
     private Text settingsVolumeLabel;
+    private Text settingsFbxCameraHeightLabel;
     private Text settingsFullscreenLabel;
     private Text settingsSkipUnreadLabel;
     private Text settingsSavePanelButtonLabel;
@@ -306,6 +309,7 @@ public class GalTemplateRuntime : MonoBehaviour
     private Slider textSpeedSlider;
     private Slider autoDelaySlider;
     private Slider volumeSlider;
+    private Slider fbxCameraHeightSlider;
     private GameObject portraitDebugRoot;
     private Text portraitDebugTitleText;
     private Text portraitDebugSlotLabel;
@@ -2247,6 +2251,7 @@ public class GalTemplateRuntime : MonoBehaviour
         SetText(settingsTextSpeedLabel, T("ui.settings.text_speed", "文本速度"));
         SetText(settingsAutoDelayLabel, T("ui.settings.auto_delay", "自动间隔"));
         SetText(settingsVolumeLabel, T("ui.settings.volume", "主音量"));
+        SetText(settingsFbxCameraHeightLabel, T("ui.settings.camera_height", "摄像头高度"));
         SetText(settingsFullscreenLabel, T("ui.settings.fullscreen", "全屏显示"));
         SetText(settingsSkipUnreadLabel, T("ui.settings.skip_unread", "允许跳过未读文本"));
         SetText(languageValueText, GetLanguageButtonText());
@@ -3084,6 +3089,15 @@ public class GalTemplateRuntime : MonoBehaviour
             SaveSettings();
         });
 
+        fbxCameraHeightSlider = CreateSettingsSlider(panel.transform, T("ui.settings.camera_height", "摄像头高度"), new Vector2(240f, -395f), -0.4f, 0.6f, settings.fbxCameraHeight, false, out settingsFbxCameraHeightLabel, out fbxCameraHeightValueText);
+        fbxCameraHeightSlider.onValueChanged.AddListener(delegate(float value)
+        {
+            settings.fbxCameraHeight = value;
+            fbxCameraHeightValueText.text = FormatCameraHeight(value);
+            ApplySettings();
+            SaveSettings();
+        });
+
         fullscreenToggle = CreateSettingsToggle(panel.transform, T("ui.settings.fullscreen", "全屏显示"), new Vector2(570f, -142f), settings.fullscreen, out settingsFullscreenLabel);
         fullscreenToggle.onValueChanged.AddListener(delegate(bool value)
         {
@@ -3237,11 +3251,13 @@ public class GalTemplateRuntime : MonoBehaviour
         textSpeedSlider.SetValueWithoutNotify(settings.textSpeed);
         autoDelaySlider.SetValueWithoutNotify(settings.autoDelay);
         volumeSlider.SetValueWithoutNotify(settings.masterVolume);
+        fbxCameraHeightSlider.SetValueWithoutNotify(settings.fbxCameraHeight);
         fullscreenToggle.SetIsOnWithoutNotify(settings.fullscreen);
         skipUnreadToggle.SetIsOnWithoutNotify(settings.skipUnreadText);
         textSpeedValueText.text = settings.textSpeed.ToString("0");
         autoDelayValueText.text = settings.autoDelay.ToString("0.0") + "s";
         volumeValueText.text = Mathf.RoundToInt(settings.masterVolume * 100f) + "%";
+        fbxCameraHeightValueText.text = FormatCameraHeight(settings.fbxCameraHeight);
         languageValueText.text = GetLanguageButtonText();
         settingsSavePanelButton.interactable = isInGame;
         RefreshOverlayNavigationButtons();
@@ -3497,6 +3513,7 @@ public class GalTemplateRuntime : MonoBehaviour
         settings.textSpeed = PlayerPrefs.GetFloat("GalTemplate.TextSpeed", settings.textSpeed);
         settings.autoDelay = PlayerPrefs.GetFloat("GalTemplate.AutoDelay", settings.autoDelay);
         settings.masterVolume = PlayerPrefs.GetFloat("GalTemplate.MasterVolume", settings.masterVolume);
+        settings.fbxCameraHeight = PlayerPrefs.GetFloat("GalTemplate.FbxCameraHeight", settings.fbxCameraHeight);
         settings.fullscreen = PlayerPrefs.GetInt("GalTemplate.Fullscreen", settings.fullscreen ? 1 : 0) == 1;
         settings.skipUnreadText = PlayerPrefs.GetInt("GalTemplate.SkipUnreadText", settings.skipUnreadText ? 1 : 0) == 1;
         settings.language = PlayerPrefs.GetString("GalTemplate.Language", settings.language);
@@ -3508,6 +3525,7 @@ public class GalTemplateRuntime : MonoBehaviour
         PlayerPrefs.SetFloat("GalTemplate.TextSpeed", settings.textSpeed);
         PlayerPrefs.SetFloat("GalTemplate.AutoDelay", settings.autoDelay);
         PlayerPrefs.SetFloat("GalTemplate.MasterVolume", settings.masterVolume);
+        PlayerPrefs.SetFloat("GalTemplate.FbxCameraHeight", settings.fbxCameraHeight);
         PlayerPrefs.SetInt("GalTemplate.Fullscreen", settings.fullscreen ? 1 : 0);
         PlayerPrefs.SetInt("GalTemplate.SkipUnreadText", settings.skipUnreadText ? 1 : 0);
         PlayerPrefs.SetString("GalTemplate.Language", settings.language);
@@ -3519,6 +3537,12 @@ public class GalTemplateRuntime : MonoBehaviour
     {
         AudioListener.volume = Mathf.Clamp01(settings.masterVolume);
         Screen.fullScreen = settings.fullscreen;
+        GalFbxSceneController.Instance.SetCameraHeightOffset(settings.fbxCameraHeight);
+    }
+
+    private static string FormatCameraHeight(float value)
+    {
+        return (value >= 0f ? "+" : string.Empty) + value.ToString("0.00") + "m";
     }
 
     private void ShowToast(string message)

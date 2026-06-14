@@ -7,6 +7,9 @@ using UnityEngine.UI;
 public class GalFbxSceneController : MonoBehaviour
 {
     private const string DefaultResourcePath = "FbxScenes/car_glb";
+    private const float DefaultCameraHeightOffset = 0.18f;
+    private const float MinCameraHeightOffset = -0.4f;
+    private const float MaxCameraHeightOffset = 0.6f;
 
     private static GalFbxSceneController instance;
 
@@ -22,6 +25,7 @@ public class GalFbxSceneController : MonoBehaviour
     private float sceneCameraMoveBlend;
     private float sceneCameraTurnLean;
     private float sceneCameraStepTime;
+    private float cameraHeightOffset = DefaultCameraHeightOffset;
     private Canvas overlayCanvas;
     private Image blackImage;
     private bool isActive;
@@ -56,6 +60,11 @@ public class GalFbxSceneController : MonoBehaviour
     public void SetControlsEnabled(bool enabled)
     {
         controlsEnabled = enabled;
+    }
+
+    public void SetCameraHeightOffset(float offset)
+    {
+        cameraHeightOffset = Mathf.Clamp(offset, MinCameraHeightOffset, MaxCameraHeightOffset);
     }
 
     public void Enter(string resourcePath, float pixelSize, Action onBlackout = null)
@@ -233,7 +242,7 @@ public class GalFbxSceneController : MonoBehaviour
         Quaternion bodyTurn = Quaternion.Euler(0f, sceneCameraBodyYaw, 0f);
         Quaternion manualLook = Quaternion.Euler(totalLook.y, totalLook.x, 0f);
 
-        sceneCameraTransform.position = sceneCameraBasePosition + sceneCameraBaseRotation * (sceneCameraInputOffset + sway + walkBob);
+        sceneCameraTransform.position = sceneCameraBasePosition + Vector3.up * cameraHeightOffset + sceneCameraBaseRotation * (sceneCameraInputOffset + sway + walkBob);
         sceneCameraTransform.rotation = sceneCameraBaseRotation * bodyTurn * manualLook * roll;
     }
 
