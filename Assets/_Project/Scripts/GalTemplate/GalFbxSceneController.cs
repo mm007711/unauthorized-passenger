@@ -158,6 +158,13 @@ public class GalFbxSceneController : MonoBehaviour
             sceneCameraBaseRotation = sceneCameraTransform.rotation;
             sceneCameraInputOffset = Vector3.zero;
             sceneCameraLookOffset = Vector2.zero;
+            CabinMoodImageEffect mood = sceneCamera.GetComponent<CabinMoodImageEffect>();
+            if (mood == null)
+            {
+                mood = sceneCamera.gameObject.AddComponent<CabinMoodImageEffect>();
+            }
+
+            mood.intensity = 0.9f;
         }
 
         AddReferenceMoodLights(importedScene);
