@@ -140,7 +140,7 @@ public class GalFbxSceneController : MonoBehaviour
         }
         else
         {
-            sceneCamera = CreateFallbackCamera(sceneBounds);
+            sceneCamera = CreateFallbackCamera(sceneBounds, importedScene);
         }
 
         if (sceneCamera != null && pixelSize > 1f)
@@ -420,16 +420,16 @@ public class GalFbxSceneController : MonoBehaviour
         camera.rect = new Rect(0f, 0f, 1f, 1f);
     }
 
-    private Camera CreateFallbackCamera(Bounds bounds)
+    private Camera CreateFallbackCamera(Bounds bounds, GameObject importedScene)
     {
         GameObject cameraObject = new GameObject("Fallback FBX Camera");
         cameraObject.transform.SetParent(sceneRoot.transform, false);
         Camera camera = cameraObject.AddComponent<Camera>();
         camera.clearFlags = CameraClearFlags.SolidColor;
         camera.backgroundColor = new Color(0.02f, 0.025f, 0.04f, 1f);
-        camera.fieldOfView = 50f;
+        camera.fieldOfView = 62f;
         camera.depth = 100f;
-        camera.nearClipPlane = 0.03f;
+        camera.nearClipPlane = 0.02f;
         camera.farClipPlane = 250f;
 
         Vector3 size = bounds.size;
@@ -438,15 +438,129 @@ public class GalFbxSceneController : MonoBehaviour
         Vector3 sideAxis = lengthIsX ? Vector3.forward : Vector3.right;
         float longSize = Mathf.Max(lengthIsX ? size.x : size.z, 2f);
         float sideSize = Mathf.Max(lengthIsX ? size.z : size.x, 1f);
-        float eyeHeight = bounds.min.y + Mathf.Clamp(size.y * 0.48f, 0.85f, 2.2f);
-        Vector3 cameraPosition = bounds.center - longAxis * longSize * 0.42f - sideAxis * sideSize * 0.05f;
+        float eyeHeight = bounds.min.y + Mathf.Clamp(size.y * 0.54f, 1.45f, 2.65f);
+        Vector3 cameraPosition;
+        Vector3 lookTarget;
+
+        if (TryGetVehicleInteriorCameraPose(importedScene, bounds, longAxis, sideAxis, longSize, sideSize, eyeHeight, out cameraPosition, out lookTarget))
+        {
+            cameraObject.transform.position = cameraPosition;
+            cameraObject.transform.rotation = Quaternion.LookRotation((lookTarget - cameraPosition).normalized, Vector3.up);
+            Debug.Log("GAL FBX vehicle fallback camera bounds=" + bounds + " position=" + cameraPosition + " target=" + lookTarget);
+            return camera;
+        }
+
+        cameraPosition = bounds.center - longAxis * longSize * 0.34f - sideAxis * sideSize * 0.02f;
         cameraPosition.y = eyeHeight;
-        Vector3 lookTarget = bounds.center + longAxis * longSize * 0.25f;
-        lookTarget.y = eyeHeight;
+        lookTarget = bounds.center + longAxis * longSize * 0.22f;
+        lookTarget.y = eyeHeight - 0.05f;
         cameraObject.transform.position = cameraPosition;
         cameraObject.transform.rotation = Quaternion.LookRotation((lookTarget - cameraPosition).normalized, Vector3.up);
         Debug.Log("GAL FBX fallback camera bounds=" + bounds + " position=" + cameraPosition + " target=" + lookTarget);
         return camera;
+    }
+
+    private static bool TryGetVehicleInteriorCameraPose(
+        GameObject importedScene,
+        Bounds bounds,
+        Vector3 longAxis,
+        Vector3 sideAxis,
+        float longSize,
+        float sideSize,
+        float eyeHeight,
+        out Vector3 cameraPosition,
+        out Vector3 lookTarget)
+    {
+        cameraPosition = Vector3.zero;
+        lookTarget = Vector3.zero;
+        if (importedScene == null)
+        {
+            return false;
+        }
+
+        bool hasSteering = TryFindNamedRendererCenter(importedScene, new[] { "steering", "driver", "gps_monitor" }, out Vector3 frontHint);
+        bool hasBackDoor = TryFindNamedRendererCenter(importedScene, new[] { "backdoor", "rear" }, out Vector3 rearHint);
+        bool hasFrontDoor = TryFindNamedRendererCenter(importedScene, new[] { "frontdoor" }, out Vector3 frontDoorHint);
+        if (!hasSteering && !hasBackDoor && !hasFrontDoor)
+        {
+            return false;
+        }
+
+        Vector3 forwardDirection = longAxis;
+        if (hasSteering && hasBackDoor)
+        {
+            forwardDirection = FlattenHorizontal(rearHint - frontHint).normalized;
+        }
+        else if (hasSteering)
+        {
+            float steeringSide = Vector3.Dot(frontHint - bounds.center, longAxis);
+            forwardDirection = steeringSide > 0f ? -longAxis : longAxis;
+        }
+
+        if (forwardDirection.sqrMagnitude < 0.001f)
+        {
+            return false;
+        }
+
+        Vector3 aisleCenter = bounds.center;
+        Vector3 entryHint = hasFrontDoor ? frontDoorHint : frontHint;
+        float entryOffset = Mathf.Clamp(longSize * 0.12f, 1.1f, 2.2f);
+        cameraPosition = entryHint + forwardDirection * entryOffset;
+        cameraPosition += sideAxis * Mathf.Clamp(sideSize * 0.02f, -0.06f, 0.06f);
+        cameraPosition.x = Mathf.Lerp(cameraPosition.x, aisleCenter.x, 0.78f);
+        cameraPosition.z = Mathf.Lerp(cameraPosition.z, aisleCenter.z, 0.12f);
+        cameraPosition.y = eyeHeight;
+
+        lookTarget = aisleCenter + forwardDirection * Mathf.Clamp(longSize * 0.22f, 1.8f, 3.4f);
+        lookTarget.y = eyeHeight - 0.08f;
+        return true;
+    }
+
+    private static Vector3 FlattenHorizontal(Vector3 value)
+    {
+        value.y = 0f;
+        return value;
+    }
+
+    private static bool TryFindNamedRendererCenter(GameObject root, string[] patterns, out Vector3 center)
+    {
+        center = Vector3.zero;
+        if (root == null || patterns == null || patterns.Length == 0)
+        {
+            return false;
+        }
+
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        Vector3 sum = Vector3.zero;
+        int count = 0;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null)
+            {
+                continue;
+            }
+
+            string hierarchyPath = GetHierarchyPath(renderer.transform).ToLowerInvariant();
+            for (int patternIndex = 0; patternIndex < patterns.Length; patternIndex++)
+            {
+                string pattern = patterns[patternIndex];
+                if (!string.IsNullOrEmpty(pattern) && hierarchyPath.Contains(pattern))
+                {
+                    sum += renderer.bounds.center;
+                    count++;
+                    break;
+                }
+            }
+        }
+
+        if (count == 0)
+        {
+            return false;
+        }
+
+        center = sum / count;
+        return true;
     }
 
     private static Bounds GetSceneBounds(GameObject importedScene)
