@@ -72,7 +72,7 @@ Hotspots can also run commands before normal movement. The current exterior test
 ```json
 {
   "command": "enter_fbx_scene",
-  "path": "FbxScenes/car",
+  "path": "FbxScenes/car_glb",
   "amount": 7
 }
 ```

@@ -6,7 +6,7 @@ using UnityEngine.UI;
 
 public class GalFbxSceneController : MonoBehaviour
 {
-    private const string DefaultResourcePath = "FbxScenes/car";
+    private const string DefaultResourcePath = "FbxScenes/car_glb";
 
     private static GalFbxSceneController instance;
 

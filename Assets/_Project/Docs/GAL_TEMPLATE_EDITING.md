@@ -150,7 +150,7 @@ Hotspots can run commands before moving or playing dialogue. For a black-screen 
   "commands": [
     {
       "command": "enter_fbx_scene",
-      "path": "FbxScenes/car",
+      "path": "FbxScenes/car_glb",
       "amount": 7
     }
   ]
