@@ -485,7 +485,7 @@ public class GalFbxSceneController : MonoBehaviour
 
         bool hasSteering = TryFindNamedRendererCenter(importedScene, new[] { "steering", "driver", "gps_monitor" }, out Vector3 frontHint);
         bool hasBackDoor = TryFindNamedRendererCenter(importedScene, new[] { "backdoor", "rear" }, out Vector3 rearHint);
-        bool hasFrontDoor = TryFindNamedRendererCenter(importedScene, new[] { "frontdoor" }, out Vector3 frontDoorHint);
+        bool hasFrontDoor = TryFindNamedRendererCenter(importedScene, new[] { "frontdoor" }, out _);
         if (!hasSteering && !hasBackDoor && !hasFrontDoor)
         {
             return false;
@@ -494,7 +494,9 @@ public class GalFbxSceneController : MonoBehaviour
         Vector3 frontDirection = longAxis;
         if (hasSteering && hasBackDoor)
         {
-            frontDirection = FlattenHorizontal(frontHint - rearHint).normalized;
+            float frontDistance = Vector3.Dot(frontHint - bounds.center, longAxis);
+            float rearDistance = Vector3.Dot(rearHint - bounds.center, longAxis);
+            frontDirection = frontDistance >= rearDistance ? longAxis : -longAxis;
         }
         else if (hasSteering)
         {
@@ -508,12 +510,8 @@ public class GalFbxSceneController : MonoBehaviour
         }
 
         Vector3 aisleCenter = bounds.center;
-        Vector3 rearAnchor = hasBackDoor ? rearHint : aisleCenter - frontDirection * (longSize * 0.35f);
-        float aisleOffset = Mathf.Clamp(longSize * 0.16f, 1.7f, 2.6f);
-        cameraPosition = rearAnchor + frontDirection * aisleOffset;
-        cameraPosition += sideAxis * Mathf.Clamp(sideSize * 0.02f, -0.05f, 0.05f);
-        cameraPosition.x = Mathf.Lerp(cameraPosition.x, aisleCenter.x, 0.88f);
-        cameraPosition.z = Mathf.Lerp(cameraPosition.z, aisleCenter.z, 0.18f);
+        float standingOffset = Mathf.Clamp(longSize * 0.24f, 2.6f, 3.6f);
+        cameraPosition = aisleCenter - frontDirection * standingOffset;
         cameraPosition.y = eyeHeight;
 
         lookTarget = aisleCenter + frontDirection * Mathf.Clamp(longSize * 0.36f, 3.2f, 5f);
