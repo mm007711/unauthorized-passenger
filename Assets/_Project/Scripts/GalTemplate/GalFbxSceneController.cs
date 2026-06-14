@@ -132,6 +132,7 @@ public class GalFbxSceneController : MonoBehaviour
         }
 
         int lightCount = EnableImportedLights(importedScene);
+        Bounds sceneBounds = GetSceneBounds(importedScene);
         sceneCamera = SelectImportedCamera(importedScene);
         if (sceneCamera != null)
         {
@@ -139,7 +140,6 @@ public class GalFbxSceneController : MonoBehaviour
         }
         else
         {
-            Bounds sceneBounds = GetSceneBounds(importedScene);
             sceneCamera = CreateFallbackCamera(sceneBounds);
         }
 
@@ -183,13 +183,11 @@ public class GalFbxSceneController : MonoBehaviour
             mood.intensity = 0.9f;
         }
 
-        AddReferenceMoodLights(importedScene);
+        AddReferenceMoodLights(sceneBounds);
 
         if (lightCount == 0)
         {
-            AddLight("FBX Fallback Key Light", new Vector3(0f, 3.2f, -2.2f), new Color(0.95f, 0.82f, 1f, 1f), 1.4f);
-            AddLight("FBX Fallback Fill Light", new Vector3(2f, 1.8f, 1.8f), new Color(0.45f, 0.65f, 1f, 1f), 0.85f);
-            RenderSettings.ambientLight = new Color(0.22f, 0.2f, 0.28f, 1f);
+            AddFallbackLights(sceneBounds);
         }
     }
 
@@ -459,18 +457,70 @@ public class GalFbxSceneController : MonoBehaviour
         }
 
         Renderer[] renderers = importedScene.GetComponentsInChildren<Renderer>(true);
-        if (renderers.Length == 0)
+        List<Renderer> usableRenderers = GetUsableSceneRenderers(renderers);
+        if (usableRenderers.Count == 0)
         {
-            return new Bounds(importedScene.transform.position, new Vector3(3f, 2f, 7f));
+            if (renderers.Length == 0)
+            {
+                return new Bounds(importedScene.transform.position, new Vector3(3f, 2f, 7f));
+            }
+
+            usableRenderers.AddRange(renderers);
         }
 
-        Bounds bounds = renderers[0].bounds;
-        for (int i = 1; i < renderers.Length; i++)
+        Bounds bounds = usableRenderers[0].bounds;
+        for (int i = 1; i < usableRenderers.Count; i++)
         {
-            bounds.Encapsulate(renderers[i].bounds);
+            bounds.Encapsulate(usableRenderers[i].bounds);
+        }
+
+        if (usableRenderers.Count != renderers.Length)
+        {
+            Debug.Log("GAL FBX filtered scene bounds renderers=" + usableRenderers.Count + "/" + renderers.Length + " bounds=" + bounds);
         }
 
         return bounds;
+    }
+
+    private static List<Renderer> GetUsableSceneRenderers(Renderer[] renderers)
+    {
+        List<Renderer> result = new List<Renderer>();
+        if (renderers == null)
+        {
+            return result;
+        }
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null)
+            {
+                continue;
+            }
+
+            Bounds bounds = renderer.bounds;
+            Vector3 size = bounds.size;
+            if (!IsFinite(bounds.center) || !IsFinite(size))
+            {
+                continue;
+            }
+
+            string hierarchyPath = GetHierarchyPath(renderer.transform).ToLowerInvariant();
+            float maxDimension = Mathf.Max(size.x, Mathf.Max(size.y, size.z));
+            if (hierarchyPath.Contains("skfb_offset") || maxDimension > 250f || Mathf.Abs(bounds.center.y) > 1000f)
+            {
+                continue;
+            }
+
+            result.Add(renderer);
+        }
+
+        return result;
+    }
+
+    private static bool IsFinite(Vector3 value)
+    {
+        return float.IsFinite(value.x) && float.IsFinite(value.y) && float.IsFinite(value.z);
     }
 
     private static int EnableImportedLights(GameObject importedScene)
@@ -496,18 +546,34 @@ public class GalFbxSceneController : MonoBehaviour
         return lights.Length;
     }
 
-    private void AddReferenceMoodLights(GameObject importedScene)
+    private void AddReferenceMoodLights(Bounds bounds)
     {
-        Bounds bounds = GetSceneBounds(importedScene);
         Vector3 center = bounds.center;
-        float height = bounds.min.y + Mathf.Max(1.4f, bounds.size.y * 0.72f);
+        float lightY = bounds.min.y + Mathf.Max(1.4f, bounds.size.y * 0.72f);
         float forward = Mathf.Max(bounds.size.x, bounds.size.z) * 0.24f;
 
-        AddLight("Reference Pink Aisle Wash", center + new Vector3(-0.35f, height, -forward), new Color(1f, 0.38f, 0.9f, 1f), 1.35f);
-        AddLight("Reference Violet Forward Glow", center + new Vector3(0.2f, height * 0.82f, forward), new Color(0.62f, 0.45f, 1f, 1f), 1.1f);
-        AddLight("Reference Cool Window Fill", center + new Vector3(bounds.extents.x * 0.78f, height * 0.72f, 0f), new Color(0.28f, 0.45f, 0.72f, 1f), 0.75f);
+        AddLight("Reference Pink Aisle Wash", new Vector3(center.x - 0.35f, lightY, center.z - forward), new Color(1f, 0.38f, 0.9f, 1f), 1.35f);
+        AddLight("Reference Violet Forward Glow", new Vector3(center.x + 0.2f, Mathf.Lerp(bounds.min.y, lightY, 0.82f), center.z + forward), new Color(0.62f, 0.45f, 1f, 1f), 1.1f);
+        AddLight("Reference Cool Window Fill", new Vector3(center.x + bounds.extents.x * 0.78f, Mathf.Lerp(bounds.min.y, lightY, 0.72f), center.z), new Color(0.28f, 0.45f, 0.72f, 1f), 0.75f);
 
         RenderSettings.ambientLight = new Color(0.16f, 0.12f, 0.24f, 1f);
+    }
+
+    private void AddFallbackLights(Bounds bounds)
+    {
+        Vector3 center = bounds.center;
+        float lightY = bounds.min.y + Mathf.Max(1.35f, bounds.size.y * 0.68f);
+        float longSize = Mathf.Max(bounds.size.x, bounds.size.z);
+        Vector3 longAxis = bounds.size.x > bounds.size.z ? Vector3.right : Vector3.forward;
+        Vector3 sideAxis = bounds.size.x > bounds.size.z ? Vector3.forward : Vector3.right;
+        Vector3 keyPosition = center - longAxis * longSize * 0.22f;
+        keyPosition.y = lightY;
+        Vector3 fillPosition = center + sideAxis * Mathf.Max(1.2f, bounds.extents.x * 0.55f);
+        fillPosition.y = Mathf.Lerp(bounds.min.y, lightY, 0.8f);
+
+        AddLight("FBX Fallback Key Light", keyPosition, new Color(0.95f, 0.82f, 1f, 1f), 1.4f);
+        AddLight("FBX Fallback Fill Light", fillPosition, new Color(0.45f, 0.65f, 1f, 1f), 0.85f);
+        RenderSettings.ambientLight = new Color(0.22f, 0.2f, 0.28f, 1f);
     }
 
     private static string GetHierarchyPath(Transform transform)
