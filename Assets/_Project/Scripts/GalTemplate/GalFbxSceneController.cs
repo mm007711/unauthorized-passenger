@@ -143,25 +143,6 @@ public class GalFbxSceneController : MonoBehaviour
             sceneCamera = CreateFallbackCamera(sceneBounds, importedScene);
         }
 
-        if (sceneCamera != null && pixelSize > 1f)
-        {
-            PixelateImageEffect pixelate = sceneCamera.GetComponent<PixelateImageEffect>();
-            if (pixelate == null)
-            {
-                pixelate = sceneCamera.gameObject.AddComponent<PixelateImageEffect>();
-            }
-
-            pixelate.pixelSize = pixelSize;
-        }
-        else if (sceneCamera != null)
-        {
-            PixelateImageEffect pixelate = sceneCamera.GetComponent<PixelateImageEffect>();
-            if (pixelate != null)
-            {
-                Destroy(pixelate);
-            }
-        }
-
         if (sceneCamera != null)
         {
             sceneCameraTransform = sceneCamera.transform;
@@ -181,6 +162,7 @@ public class GalFbxSceneController : MonoBehaviour
             }
 
             mood.intensity = 0.9f;
+            ApplyPixelateEffect(sceneCamera, pixelSize);
         }
 
         AddReferenceMoodLights(sceneBounds);
@@ -188,6 +170,29 @@ public class GalFbxSceneController : MonoBehaviour
         if (lightCount == 0)
         {
             AddFallbackLights(sceneBounds);
+        }
+    }
+
+    private void ApplyPixelateEffect(Camera camera, float pixelSize)
+    {
+        if (camera == null)
+        {
+            return;
+        }
+
+        PixelateImageEffect pixelate = camera.GetComponent<PixelateImageEffect>();
+        if (pixelSize > 1f)
+        {
+            if (pixelate == null)
+            {
+                pixelate = camera.gameObject.AddComponent<PixelateImageEffect>();
+            }
+
+            pixelate.pixelSize = pixelSize;
+        }
+        else if (pixelate != null)
+        {
+            Destroy(pixelate);
         }
     }
 
@@ -427,7 +432,7 @@ public class GalFbxSceneController : MonoBehaviour
         Camera camera = cameraObject.AddComponent<Camera>();
         camera.clearFlags = CameraClearFlags.SolidColor;
         camera.backgroundColor = new Color(0.02f, 0.025f, 0.04f, 1f);
-        camera.fieldOfView = 62f;
+        camera.fieldOfView = 64f;
         camera.depth = 100f;
         camera.nearClipPlane = 0.02f;
         camera.farClipPlane = 250f;
@@ -486,33 +491,33 @@ public class GalFbxSceneController : MonoBehaviour
             return false;
         }
 
-        Vector3 forwardDirection = longAxis;
+        Vector3 frontDirection = longAxis;
         if (hasSteering && hasBackDoor)
         {
-            forwardDirection = FlattenHorizontal(rearHint - frontHint).normalized;
+            frontDirection = FlattenHorizontal(frontHint - rearHint).normalized;
         }
         else if (hasSteering)
         {
             float steeringSide = Vector3.Dot(frontHint - bounds.center, longAxis);
-            forwardDirection = steeringSide > 0f ? -longAxis : longAxis;
+            frontDirection = steeringSide > 0f ? longAxis : -longAxis;
         }
 
-        if (forwardDirection.sqrMagnitude < 0.001f)
+        if (frontDirection.sqrMagnitude < 0.001f)
         {
             return false;
         }
 
         Vector3 aisleCenter = bounds.center;
-        Vector3 entryHint = hasFrontDoor ? frontDoorHint : frontHint;
-        float entryOffset = Mathf.Clamp(longSize * 0.12f, 1.1f, 2.2f);
-        cameraPosition = entryHint + forwardDirection * entryOffset;
-        cameraPosition += sideAxis * Mathf.Clamp(sideSize * 0.02f, -0.06f, 0.06f);
-        cameraPosition.x = Mathf.Lerp(cameraPosition.x, aisleCenter.x, 0.78f);
-        cameraPosition.z = Mathf.Lerp(cameraPosition.z, aisleCenter.z, 0.12f);
+        Vector3 rearAnchor = hasBackDoor ? rearHint : aisleCenter - frontDirection * (longSize * 0.35f);
+        float aisleOffset = Mathf.Clamp(longSize * 0.16f, 1.7f, 2.6f);
+        cameraPosition = rearAnchor + frontDirection * aisleOffset;
+        cameraPosition += sideAxis * Mathf.Clamp(sideSize * 0.02f, -0.05f, 0.05f);
+        cameraPosition.x = Mathf.Lerp(cameraPosition.x, aisleCenter.x, 0.88f);
+        cameraPosition.z = Mathf.Lerp(cameraPosition.z, aisleCenter.z, 0.18f);
         cameraPosition.y = eyeHeight;
 
-        lookTarget = aisleCenter + forwardDirection * Mathf.Clamp(longSize * 0.22f, 1.8f, 3.4f);
-        lookTarget.y = eyeHeight - 0.08f;
+        lookTarget = aisleCenter + frontDirection * Mathf.Clamp(longSize * 0.36f, 3.2f, 5f);
+        lookTarget.y = eyeHeight - 0.14f;
         return true;
     }
 
