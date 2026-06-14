@@ -221,6 +221,8 @@ public class GalTemplateRuntime : MonoBehaviour
     private Font uiFont;
 
     private Canvas canvas;
+    private GameObject backgroundRoot;
+    private GameObject backgroundWashRoot;
     private RawImage backgroundImage;
     private AspectRatioFitter backgroundAspect;
     private GalPortraitController portraitController;
@@ -258,6 +260,13 @@ public class GalTemplateRuntime : MonoBehaviour
     private Text hudSettingsButtonLabel;
     private Text hudDebugButtonLabel;
     private Text hudTitleButtonLabel;
+    private GameObject fbxHudRoot;
+    private Text fbxBackButtonLabel;
+    private Text fbxSaveButtonLabel;
+    private Text fbxLoadButtonLabel;
+    private Text fbxHistoryButtonLabel;
+    private Text fbxSettingsButtonLabel;
+    private Text fbxTitleButtonLabel;
     private GameObject toastRoot;
     private Text toastText;
     private GameObject historyRoot;
@@ -359,11 +368,7 @@ public class GalTemplateRuntime : MonoBehaviour
 
         if (GalFbxSceneController.IsSceneActive)
         {
-            if (Input.GetKeyDown(KeyCode.Escape))
-            {
-                ExitFbxScene();
-            }
-
+            UpdateExternalSceneInput();
             return;
         }
 
@@ -479,6 +484,54 @@ public class GalTemplateRuntime : MonoBehaviour
         }
     }
 
+    private void UpdateExternalSceneInput()
+    {
+        bool overlayOpen = IsOverlayPageOpen();
+        GalFbxSceneController.Instance.SetControlsEnabled(!overlayOpen && !IsPointerOverInteractiveUi());
+
+        if (overlayOpen)
+        {
+            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
+            {
+                ExitOverlayPages();
+            }
+
+            return;
+        }
+
+        if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
+        {
+            if (Input.GetKeyDown(KeyCode.S))
+            {
+                SaveGame();
+            }
+            else if (Input.GetKeyDown(KeyCode.L))
+            {
+                LoadLatestGame();
+            }
+        }
+        else if (Input.GetKeyDown(KeyCode.L))
+        {
+            ShowLoadPanel();
+        }
+        else if (Input.GetKeyDown(KeyCode.H))
+        {
+            ShowHistory();
+        }
+        else if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            ExitFbxScene();
+        }
+    }
+
+    private bool IsOverlayPageOpen()
+    {
+        return isSettingsOpen ||
+            isSaveLoadOpen ||
+            (historyRoot != null && historyRoot.activeSelf) ||
+            (portraitDebugRoot != null && portraitDebugRoot.activeSelf);
+    }
+
     private void QuitGame()
     {
 #if UNITY_EDITOR
@@ -581,6 +634,7 @@ public class GalTemplateRuntime : MonoBehaviour
 
         try
         {
+            bool wasExternalScene = GalFbxSceneController.IsSceneActive;
             string json = File.ReadAllText(path, Encoding.UTF8);
             GalTemplateSaveData data = JsonUtility.FromJson<GalTemplateSaveData>(json);
             if (data == null || string.IsNullOrEmpty(data.currentNodeId))
@@ -644,6 +698,15 @@ public class GalTemplateRuntime : MonoBehaviour
 
             ExitOverlayPages();
             ShowToast(string.Format(T("ui.toast.loaded_slot", "已读取槽位 {0}。"), slot));
+            if (wasExternalScene)
+            {
+                SetExternalSceneHudVisible(false);
+                GalFbxSceneController.Instance.Exit(delegate
+                {
+                    SetGalSceneLayersVisible(true);
+                });
+            }
+
             return true;
         }
         catch (Exception exception)
@@ -1094,14 +1157,32 @@ public class GalTemplateRuntime : MonoBehaviour
         GalFbxSceneController.Instance.Exit(ShowGalAfterExternalScene);
     }
 
+    private void ShowMainMenuFromExternalScene()
+    {
+        if (!GalFbxSceneController.IsSceneActive)
+        {
+            ShowMainMenu();
+            return;
+        }
+
+        CloseOverlayPages(true);
+        SetExternalSceneHudVisible(false);
+        GalFbxSceneController.Instance.Exit(delegate
+        {
+            SetGalSceneLayersVisible(true);
+            ShowMainMenu();
+        });
+    }
+
     private void HideGalForExternalScene()
     {
         CancelAutoAdvance();
         if (canvas != null)
         {
-            canvas.enabled = false;
+            canvas.enabled = true;
         }
 
+        SetGalSceneLayersVisible(false);
         if (mainMenuRoot != null)
         {
             mainMenuRoot.SetActive(false);
@@ -1128,6 +1209,7 @@ public class GalTemplateRuntime : MonoBehaviour
         }
 
         CloseOverlayPages(true);
+        SetExternalSceneHudVisible(true);
     }
 
     private void ShowGalAfterExternalScene()
@@ -1136,6 +1218,9 @@ public class GalTemplateRuntime : MonoBehaviour
         {
             canvas.enabled = true;
         }
+
+        SetExternalSceneHudVisible(false);
+        SetGalSceneLayersVisible(true);
 
         if (!isInGame)
         {
@@ -1149,6 +1234,27 @@ public class GalTemplateRuntime : MonoBehaviour
         }
 
         ShowExplore();
+    }
+
+    private void SetGalSceneLayersVisible(bool visible)
+    {
+        if (backgroundRoot != null)
+        {
+            backgroundRoot.SetActive(visible);
+        }
+
+        if (backgroundWashRoot != null)
+        {
+            backgroundWashRoot.SetActive(visible);
+        }
+    }
+
+    private void SetExternalSceneHudVisible(bool visible)
+    {
+        if (fbxHudRoot != null)
+        {
+            fbxHudRoot.SetActive(visible);
+        }
     }
 
     private void ShowExplore()
@@ -2152,8 +2258,19 @@ public class GalTemplateRuntime : MonoBehaviour
         SetText(settingsDebugButtonLabel, T("ui.settings.portrait_debug", "立绘调试"));
         SetText(settingsExitButtonLabel, T("ui.common.exit", "退出"));
         RefreshPortraitDebugLabels();
+        RefreshExternalSceneHudLabels();
 
         RefreshMenuState();
+    }
+
+    private void RefreshExternalSceneHudLabels()
+    {
+        SetText(fbxBackButtonLabel, T("ui.common.back", "Back"));
+        SetText(fbxSaveButtonLabel, T("ui.hud.save", "Save"));
+        SetText(fbxLoadButtonLabel, T("ui.hud.load", "Load"));
+        SetText(fbxHistoryButtonLabel, T("ui.hud.history", "History"));
+        SetText(fbxSettingsButtonLabel, T("ui.common.settings", "Settings"));
+        SetText(fbxTitleButtonLabel, T("ui.hud.title", "Title"));
     }
 
     private static void SetText(Text target, string value)
@@ -2378,6 +2495,7 @@ public class GalTemplateRuntime : MonoBehaviour
         BuildDialogue(canvasObject.transform);
         BuildExplore(canvasObject.transform);
         BuildHud(canvasObject.transform);
+        BuildExternalSceneHud(canvasObject.transform);
         BuildTransition(canvasObject.transform);
         BuildToast(canvasObject.transform);
         BuildHistory(canvasObject.transform);
@@ -2389,6 +2507,7 @@ public class GalTemplateRuntime : MonoBehaviour
     private void BuildBackground(Transform parent)
     {
         GameObject frame = CreateUiObject("Background Frame", parent);
+        backgroundRoot = frame;
         Stretch(frame.GetComponent<RectTransform>());
         Image frameImage = frame.AddComponent<Image>();
         frameImage.color = new Color(0.96f, 0.95f, 0.92f, 1f);
@@ -2406,6 +2525,7 @@ public class GalTemplateRuntime : MonoBehaviour
         backgroundAspect.aspectRatio = 16f / 9f;
 
         GameObject wash = CreateUiObject("Subtle Wash", parent);
+        backgroundWashRoot = wash;
         Stretch(wash.GetComponent<RectTransform>());
         Image washImage = wash.AddComponent<Image>();
         washImage.color = new Color(1f, 0.98f, 0.92f, 0.18f);
@@ -2598,6 +2718,36 @@ public class GalTemplateRuntime : MonoBehaviour
         AddButtonLayout(CreateButton(hudRoot.transform, T("ui.hud.portrait_debug", "立绘"), ShowPortraitDebug, out hudDebugButtonLabel), 46f, 104f);
         AddButtonLayout(CreateButton(hudRoot.transform, T("ui.hud.title", "标题"), ShowMainMenu, out hudTitleButtonLabel), 46f, 104f);
         hudRoot.SetActive(false);
+    }
+
+    private void BuildExternalSceneHud(Transform parent)
+    {
+        fbxHudRoot = CreateUiObject("External Scene HUD", parent);
+        RectTransform hudRect = fbxHudRoot.GetComponent<RectTransform>();
+        hudRect.anchorMin = new Vector2(1f, 1f);
+        hudRect.anchorMax = new Vector2(1f, 1f);
+        hudRect.pivot = new Vector2(1f, 1f);
+        hudRect.sizeDelta = new Vector2(720f, 58f);
+        hudRect.anchoredPosition = new Vector2(-32f, -28f);
+
+        Image background = fbxHudRoot.AddComponent<Image>();
+        background.color = new Color(0.03f, 0.03f, 0.05f, 0.42f);
+
+        HorizontalLayoutGroup layout = fbxHudRoot.AddComponent<HorizontalLayoutGroup>();
+        layout.padding = new RectOffset(10, 10, 6, 6);
+        layout.spacing = 8f;
+        layout.childControlWidth = false;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = false;
+        layout.childAlignment = TextAnchor.MiddleRight;
+
+        AddButtonLayout(CreateButton(fbxHudRoot.transform, T("ui.common.back", "Back"), ExitFbxScene, out fbxBackButtonLabel), 46f, 96f);
+        AddButtonLayout(CreateButton(fbxHudRoot.transform, T("ui.hud.save", "Save"), ShowSavePanel, out fbxSaveButtonLabel), 46f, 96f);
+        AddButtonLayout(CreateButton(fbxHudRoot.transform, T("ui.hud.load", "Load"), ShowLoadPanel, out fbxLoadButtonLabel), 46f, 96f);
+        AddButtonLayout(CreateButton(fbxHudRoot.transform, T("ui.hud.history", "History"), ShowHistory, out fbxHistoryButtonLabel), 46f, 112f);
+        AddButtonLayout(CreateButton(fbxHudRoot.transform, T("ui.common.settings", "Settings"), ShowSettings, out fbxSettingsButtonLabel), 46f, 112f);
+        AddButtonLayout(CreateButton(fbxHudRoot.transform, T("ui.hud.title", "Title"), ShowMainMenuFromExternalScene, out fbxTitleButtonLabel), 46f, 96f);
+        fbxHudRoot.SetActive(false);
     }
 
     private void BuildToast(Transform parent)

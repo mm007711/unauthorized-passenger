@@ -25,6 +25,7 @@ public class GalFbxSceneController : MonoBehaviour
     private Canvas overlayCanvas;
     private Image blackImage;
     private bool isActive;
+    private bool controlsEnabled = true;
     private readonly List<Camera> disabledCameras = new List<Camera>();
 
     public static GalFbxSceneController Instance
@@ -50,6 +51,11 @@ public class GalFbxSceneController : MonoBehaviour
     public static bool IsSceneActive
     {
         get { return instance != null && instance.isActive; }
+    }
+
+    public void SetControlsEnabled(bool enabled)
+    {
+        controlsEnabled = enabled;
     }
 
     public void Enter(string resourcePath, float pixelSize, Action onBlackout = null)
@@ -194,7 +200,16 @@ public class GalFbxSceneController : MonoBehaviour
             return;
         }
 
-        UpdateCameraControlInput();
+        if (controlsEnabled)
+        {
+            UpdateCameraControlInput();
+        }
+        else
+        {
+            sceneCameraMoveBlend = Mathf.Lerp(sceneCameraMoveBlend, 0f, GetDampedInterpolation(7f));
+            sceneCameraTurnLean = Mathf.Lerp(sceneCameraTurnLean, 0f, GetDampedInterpolation(8f));
+            sceneCameraMouseLookOffset = Vector2.Lerp(sceneCameraMouseLookOffset, Vector2.zero, GetDampedInterpolation(5f));
+        }
 
         float time = Time.unscaledTime;
         float step = Mathf.Sin(sceneCameraStepTime);
