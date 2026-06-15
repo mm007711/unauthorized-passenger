@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,6 +12,29 @@ public class GalFbxSceneController : MonoBehaviour
     private const float MinCameraHeightOffset = -0.4f;
     private const float MaxCameraHeightOffset = 0.6f;
     private const float DefaultMoodIntensity = 0.75f;
+    public const string DefaultCharacterImageId = "unauthorized_passenger";
+    public const string LocalCharacterImagePrefix = "local:";
+    private const string CharacterResourceFolder = "Characters";
+    private const string DefaultCharacterTexturePath = CharacterResourceFolder + "/" + DefaultCharacterImageId;
+    private const string CharacterShaderResourcePath = "Shaders/CharacterBillboard";
+    public const float DefaultCharacterViewportX = 0.335f;
+    public const float DefaultCharacterViewportY = 0.56f;
+    public const float DefaultCharacterViewportDepth = 3.2f;
+    public const float DefaultCharacterScreenHeight = 0.58f;
+    public const float DefaultCharacterPixelSize = 1f;
+    public const float DefaultCharacterMoodBlend = 0.3f;
+    public const float MinCharacterViewportX = -0.35f;
+    public const float MaxCharacterViewportX = 1.35f;
+    public const float MinCharacterViewportY = -0.25f;
+    public const float MaxCharacterViewportY = 1.35f;
+    public const float MinCharacterViewportDepth = 0.45f;
+    public const float MaxCharacterViewportDepth = 20f;
+    public const float MinCharacterScreenHeight = 0.05f;
+    public const float MaxCharacterScreenHeight = 2.2f;
+    public const float MinCharacterPixelSize = 1f;
+    public const float MaxCharacterPixelSize = 64f;
+    private const float CharacterDepthNearScale = 1.08f;
+    private const float CharacterDepthFarScale = 0.92f;
 
     private static readonly Color ClearAmbientLight = new Color(0.42f, 0.42f, 0.46f, 1f);
     private static readonly Color EerieAmbientLight = new Color(0.16f, 0.12f, 0.24f, 1f);
@@ -29,6 +53,11 @@ public class GalFbxSceneController : MonoBehaviour
     private GameObject sceneRoot;
     private Camera sceneCamera;
     private CabinMoodImageEffect sceneMoodEffect;
+    private GameObject sceneCharacter;
+    private Material sceneCharacterMaterial;
+    private Texture2D sceneCharacterTexture;
+    private bool sceneCharacterTextureIsRuntime;
+    private Bounds sceneBounds;
     private Transform sceneCameraTransform;
     private Vector3 sceneCameraBasePosition;
     private Quaternion sceneCameraBaseRotation;
@@ -41,6 +70,14 @@ public class GalFbxSceneController : MonoBehaviour
     private float sceneCameraStepTime;
     private float cameraHeightOffset = DefaultCameraHeightOffset;
     private float moodIntensity = DefaultMoodIntensity;
+    private string characterImageId = DefaultCharacterImageId;
+    private string characterTexturePath = DefaultCharacterTexturePath;
+    private float characterViewportX = DefaultCharacterViewportX;
+    private float characterViewportY = DefaultCharacterViewportY;
+    private float characterViewportDepth = DefaultCharacterViewportDepth;
+    private float characterScreenHeight = DefaultCharacterScreenHeight;
+    private float characterPixelSize = DefaultCharacterPixelSize;
+    private float characterMoodBlend = DefaultCharacterMoodBlend;
     private Canvas overlayCanvas;
     private Image blackImage;
     private bool isActive;
@@ -73,6 +110,11 @@ public class GalFbxSceneController : MonoBehaviour
         get { return instance != null && instance.isActive; }
     }
 
+    public static string GetLocalCharacterImportDirectory()
+    {
+        return Path.Combine(Application.persistentDataPath, "GalTemplate", "Characters");
+    }
+
     public void SetControlsEnabled(bool enabled)
     {
         controlsEnabled = enabled;
@@ -87,6 +129,44 @@ public class GalFbxSceneController : MonoBehaviour
     {
         moodIntensity = Mathf.Clamp01(intensity);
         ApplyMoodSettings();
+    }
+
+    public void SetCharacterSettings(string imageId, float viewportX, float viewportY, float viewportDepth, float screenHeight, float pixelSize, float moodBlend)
+    {
+        string normalizedImageId = NormalizeCharacterImageId(imageId);
+        bool imageChanged = normalizedImageId != characterImageId;
+        characterImageId = normalizedImageId;
+        characterTexturePath = GetCharacterTexturePath(characterImageId);
+        characterViewportX = Mathf.Clamp(viewportX, MinCharacterViewportX, MaxCharacterViewportX);
+        characterViewportY = Mathf.Clamp(viewportY, MinCharacterViewportY, MaxCharacterViewportY);
+        characterViewportDepth = Mathf.Clamp(viewportDepth, MinCharacterViewportDepth, MaxCharacterViewportDepth);
+        characterScreenHeight = Mathf.Clamp(screenHeight, MinCharacterScreenHeight, MaxCharacterScreenHeight);
+        characterPixelSize = Mathf.Clamp(pixelSize, MinCharacterPixelSize, MaxCharacterPixelSize);
+        characterMoodBlend = Mathf.Clamp01(moodBlend);
+
+        if (sceneCharacterMaterial != null)
+        {
+            sceneCharacterMaterial.SetFloat("_PixelSize", characterPixelSize);
+        }
+
+        if (sceneCharacter != null && sceneCamera != null)
+        {
+            if (imageChanged)
+            {
+                bool isRuntimeTexture;
+                Texture2D texture = LoadCharacterTexture(characterImageId, out isRuntimeTexture);
+                if (texture != null)
+                {
+                    ReleaseRuntimeCharacterTexture();
+                    sceneCharacterTexture = texture;
+                    sceneCharacterTextureIsRuntime = isRuntimeTexture;
+                    sceneCharacterMaterial.SetTexture("_MainTex", sceneCharacterTexture);
+                }
+            }
+
+            PositionSceneCharacter(sceneBounds, sceneCharacterTexture);
+            ApplyCharacterMoodSettings(Mathf.Clamp01(moodIntensity));
+        }
     }
 
     public void Enter(string resourcePath, float pixelSize, Action onBlackout = null)
@@ -163,7 +243,7 @@ public class GalFbxSceneController : MonoBehaviour
         }
 
         int lightCount = EnableImportedLights(importedScene);
-        Bounds sceneBounds = GetSceneBounds(importedScene);
+        sceneBounds = GetSceneBounds(importedScene);
         sceneCamera = SelectImportedCamera(importedScene);
         if (sceneCamera != null)
         {
@@ -193,6 +273,7 @@ public class GalFbxSceneController : MonoBehaviour
             }
 
             ApplyPixelateEffect(sceneCamera, pixelSize);
+            AddSceneCharacter(sceneBounds);
         }
 
         AddReferenceMoodLights(sceneBounds);
@@ -226,6 +307,243 @@ public class GalFbxSceneController : MonoBehaviour
         {
             Destroy(pixelate);
         }
+    }
+
+    private void AddSceneCharacter(Bounds bounds)
+    {
+        if (sceneRoot == null || sceneCamera == null)
+        {
+            return;
+        }
+
+        bool isRuntimeTexture;
+        Texture2D characterTexture = LoadCharacterTexture(characterImageId, out isRuntimeTexture);
+        if (characterTexture == null)
+        {
+            Debug.LogWarning("GAL FBX character texture missing Resources asset: " + characterTexturePath);
+            return;
+        }
+
+        sceneCharacterTexture = characterTexture;
+        sceneCharacterTextureIsRuntime = isRuntimeTexture;
+
+        Shader shader = Resources.Load<Shader>(CharacterShaderResourcePath);
+        if (shader == null)
+        {
+            shader = Shader.Find("GalTemplate/CharacterBillboard");
+        }
+
+        if (shader == null)
+        {
+            Debug.LogWarning("GAL FBX character shader missing Resources asset: " + CharacterShaderResourcePath);
+            return;
+        }
+
+        sceneCharacterMaterial = new Material(shader);
+        sceneCharacterMaterial.hideFlags = HideFlags.HideAndDontSave;
+        sceneCharacterMaterial.SetTexture("_MainTex", characterTexture);
+        sceneCharacterMaterial.SetFloat("_Opacity", 0.9f);
+        sceneCharacterMaterial.SetFloat("_WhiteCutoff", 0.93f);
+        sceneCharacterMaterial.SetFloat("_WhiteSoftness", 0.055f);
+        sceneCharacterMaterial.SetFloat("_BlackCutoff", 0.035f);
+        sceneCharacterMaterial.SetFloat("_BlackSoftness", 0.035f);
+        sceneCharacterMaterial.SetFloat("_ZTest", 4f);
+        sceneCharacterMaterial.SetFloat("_PixelSize", characterPixelSize);
+        sceneCharacterMaterial.renderQueue = 2490;
+        ApplyCharacterMoodSettings(Mathf.Clamp01(moodIntensity));
+
+        sceneCharacter = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        sceneCharacter.name = "Unauthorized Passenger Character";
+        sceneCharacter.transform.SetParent(sceneRoot.transform, true);
+
+        Collider collider = sceneCharacter.GetComponent<Collider>();
+        if (collider != null)
+        {
+            Destroy(collider);
+        }
+
+        MeshRenderer renderer = sceneCharacter.GetComponent<MeshRenderer>();
+        if (renderer != null)
+        {
+            renderer.sharedMaterial = sceneCharacterMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.sortingOrder = 0;
+        }
+
+        PositionSceneCharacter(bounds, characterTexture);
+        Debug.Log("GAL FBX character placed at viewport=(" + characterViewportX.ToString("0.000") + ", " + characterViewportY.ToString("0.000") + ") texture=" + characterTexturePath);
+    }
+
+    private Texture2D LoadCharacterTexture(string imageId, out bool isRuntimeTexture)
+    {
+        isRuntimeTexture = false;
+        string normalizedImageId = NormalizeCharacterImageId(imageId);
+        if (IsLocalCharacterImageId(normalizedImageId))
+        {
+            Texture2D localTexture = LoadLocalCharacterTexture(normalizedImageId);
+            if (localTexture != null)
+            {
+                isRuntimeTexture = true;
+                characterTexturePath = normalizedImageId;
+                return localTexture;
+            }
+
+            Debug.LogWarning("GAL FBX local character texture missing: " + normalizedImageId);
+        }
+
+        string resourcePath = GetCharacterTexturePath(normalizedImageId);
+        Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+        if (texture != null || normalizedImageId == DefaultCharacterImageId)
+        {
+            characterTexturePath = resourcePath;
+            return texture;
+        }
+
+        texture = Resources.Load<Texture2D>(DefaultCharacterTexturePath);
+        if (texture != null)
+        {
+            Debug.LogWarning("GAL FBX character texture missing Resources asset: " + resourcePath + ", using " + DefaultCharacterTexturePath);
+            characterImageId = DefaultCharacterImageId;
+            characterTexturePath = DefaultCharacterTexturePath;
+        }
+
+        return texture;
+    }
+
+    private static bool IsLocalCharacterImageId(string imageId)
+    {
+        return !string.IsNullOrEmpty(imageId) && imageId.StartsWith(LocalCharacterImagePrefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static Texture2D LoadLocalCharacterTexture(string imageId)
+    {
+        string fileName = imageId.Substring(LocalCharacterImagePrefix.Length);
+        string path = Path.Combine(GetLocalCharacterImportDirectory(), fileName);
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            if (!texture.LoadImage(bytes))
+            {
+                Destroy(texture);
+                return null;
+            }
+
+            texture.name = Path.GetFileNameWithoutExtension(path);
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.filterMode = FilterMode.Bilinear;
+            return texture;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("GAL FBX failed to load local character texture: " + path + "\n" + ex.Message);
+            return null;
+        }
+    }
+
+    private static string NormalizeCharacterImageId(string imageId)
+    {
+        if (string.IsNullOrWhiteSpace(imageId))
+        {
+            return DefaultCharacterImageId;
+        }
+
+        string normalized = imageId.Replace('\\', '/').Trim();
+        if (normalized.StartsWith(LocalCharacterImagePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            string localName = normalized.Substring(LocalCharacterImagePrefix.Length).Trim();
+            localName = Path.GetFileName(localName.Replace('\\', '/'));
+            return string.IsNullOrEmpty(localName) ? DefaultCharacterImageId : LocalCharacterImagePrefix + localName;
+        }
+
+        int slashIndex = normalized.LastIndexOf('/');
+        if (slashIndex >= 0)
+        {
+            normalized = normalized.Substring(slashIndex + 1);
+        }
+
+        int dotIndex = normalized.LastIndexOf('.');
+        if (dotIndex > 0)
+        {
+            normalized = normalized.Substring(0, dotIndex);
+        }
+
+        return string.IsNullOrEmpty(normalized) ? DefaultCharacterImageId : normalized;
+    }
+
+    private static string GetCharacterTexturePath(string imageId)
+    {
+        string normalizedImageId = NormalizeCharacterImageId(imageId);
+        if (IsLocalCharacterImageId(normalizedImageId))
+        {
+            return normalizedImageId;
+        }
+
+        return CharacterResourceFolder + "/" + normalizedImageId;
+    }
+
+    private void PositionSceneCharacter(Bounds bounds, Texture2D texture)
+    {
+        if (sceneCharacter == null || sceneCamera == null || texture == null)
+        {
+            return;
+        }
+
+        float minDepth = sceneCamera.nearClipPlane + 0.08f;
+        float maxDepth = Mathf.Max(minDepth + 0.5f, sceneCamera.farClipPlane - 0.5f);
+        float depth = Mathf.Clamp(characterViewportDepth, minDepth, maxDepth);
+        float depthT = Mathf.InverseLerp(MinCharacterViewportDepth, MaxCharacterViewportDepth, depth);
+        float easedDepthT = Mathf.SmoothStep(0f, 1f, depthT);
+
+        Vector3 worldPosition = sceneCamera.ViewportToWorldPoint(new Vector3(characterViewportX, characterViewportY, depth));
+        sceneCharacter.transform.position = worldPosition;
+
+        float viewHeightAtDepth = sceneCamera.orthographic
+            ? sceneCamera.orthographicSize * 2f
+            : 2f * depth * Mathf.Tan(sceneCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        float depthScale = Mathf.Lerp(CharacterDepthNearScale, CharacterDepthFarScale, easedDepthT);
+        float characterHeight = Mathf.Max(0.01f, viewHeightAtDepth * characterScreenHeight * depthScale);
+        float aspect = Mathf.Clamp(texture.width / Mathf.Max(1f, (float)texture.height), 0.35f, 1.25f);
+        sceneCharacter.transform.localScale = new Vector3(characterHeight * aspect, characterHeight, 1f);
+        UpdateSceneCharacterBillboard();
+    }
+
+    private void UpdateSceneCharacterBillboard()
+    {
+        if (sceneCharacter == null || sceneCameraTransform == null)
+        {
+            return;
+        }
+
+        Vector3 toCamera = sceneCameraTransform.position - sceneCharacter.transform.position;
+        if (toCamera.sqrMagnitude < 0.001f)
+        {
+            return;
+        }
+
+        sceneCharacter.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+    }
+
+    private void ApplyCharacterMoodSettings(float strength)
+    {
+        if (sceneCharacterMaterial == null)
+        {
+            return;
+        }
+
+        Color characterTint = Color.Lerp(new Color(0.82f, 0.9f, 1f, 1f), new Color(0.72f, 0.56f, 1f, 1f), strength);
+        sceneCharacterMaterial.SetColor("_MoodTint", characterTint);
+        sceneCharacterMaterial.SetFloat("_MoodBlend", Mathf.Lerp(0.02f, 0.18f, strength) * characterMoodBlend);
+        sceneCharacterMaterial.SetFloat("_MoodCounter", Mathf.Lerp(0.08f, 0.42f, strength) * characterMoodBlend);
+        sceneCharacterMaterial.SetFloat("_EdgeDarkness", Mathf.Lerp(0.04f, 0.24f, strength) * characterMoodBlend);
+        sceneCharacterMaterial.SetFloat("_RimStrength", Mathf.Lerp(0.03f, 0.15f, strength) * characterMoodBlend);
+        sceneCharacterMaterial.SetFloat("_PixelSize", characterPixelSize);
     }
 
     private void LateUpdate()
@@ -267,6 +585,7 @@ public class GalFbxSceneController : MonoBehaviour
 
         sceneCameraTransform.position = sceneCameraBasePosition + Vector3.up * cameraHeightOffset + sceneCameraBaseRotation * (sceneCameraInputOffset + sway + walkBob);
         sceneCameraTransform.rotation = sceneCameraBaseRotation * bodyTurn * manualLook * roll;
+        UpdateSceneCharacterBillboard();
     }
 
     private void UpdateCameraControlInput()
@@ -811,6 +1130,7 @@ public class GalFbxSceneController : MonoBehaviour
             sceneMoodEffect.intensity = strength;
         }
 
+        ApplyCharacterMoodSettings(strength);
         RenderSettings.ambientLight = Color.Lerp(ClearAmbientLight, EerieAmbientLight, strength);
         for (int i = 0; i < moodLights.Count; i++)
         {
@@ -827,6 +1147,26 @@ public class GalFbxSceneController : MonoBehaviour
 
     private void DestroyScene()
     {
+        ReleaseRuntimeCharacterTexture();
+
+        if (sceneCharacterMaterial != null)
+        {
+            if (Application.isPlaying)
+            {
+                Destroy(sceneCharacterMaterial);
+            }
+            else
+            {
+                DestroyImmediate(sceneCharacterMaterial);
+            }
+
+            sceneCharacterMaterial = null;
+        }
+
+        sceneCharacter = null;
+        sceneCharacterTexture = null;
+        sceneBounds = default;
+
         if (sceneRoot != null)
         {
             Destroy(sceneRoot);
@@ -838,6 +1178,27 @@ public class GalFbxSceneController : MonoBehaviour
         sceneCameraTransform = null;
         moodLights.Clear();
         RestoreOtherCameras();
+    }
+
+    private void ReleaseRuntimeCharacterTexture()
+    {
+        if (!sceneCharacterTextureIsRuntime || sceneCharacterTexture == null)
+        {
+            sceneCharacterTextureIsRuntime = false;
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(sceneCharacterTexture);
+        }
+        else
+        {
+            DestroyImmediate(sceneCharacterTexture);
+        }
+
+        sceneCharacterTexture = null;
+        sceneCharacterTextureIsRuntime = false;
     }
 
     private void EnsureBlackOverlay()

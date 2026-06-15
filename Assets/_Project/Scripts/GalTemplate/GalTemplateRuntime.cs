@@ -132,10 +132,87 @@ public class GalTemplateSettings
     public float masterVolume = 0.8f;
     public float fbxCameraHeight = 0.18f;
     public float cabinMoodIntensity = 0.75f;
+    public string fbxCharacterImageId = GalFbxSceneController.DefaultCharacterImageId;
+    public float fbxCharacterViewportX = GalFbxSceneController.DefaultCharacterViewportX;
+    public float fbxCharacterViewportY = GalFbxSceneController.DefaultCharacterViewportY;
+    public float fbxCharacterViewportDepth = GalFbxSceneController.DefaultCharacterViewportDepth;
+    public float fbxCharacterScreenHeight = GalFbxSceneController.DefaultCharacterScreenHeight;
+    public float fbxCharacterPixelSize = GalFbxSceneController.DefaultCharacterPixelSize;
+    public float fbxCharacterMoodBlend = GalFbxSceneController.DefaultCharacterMoodBlend;
     public bool fullscreen = true;
     public bool skipUnreadText;
     public string language = "zh-CN";
     public string artProfile = "default";
+}
+
+public class GalDraggablePanel : MonoBehaviour, IBeginDragHandler, IDragHandler
+{
+    public RectTransform target;
+
+    private RectTransform parentRect;
+    private Vector2 pointerOffset;
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        if (target == null)
+        {
+            target = transform as RectTransform;
+        }
+
+        parentRect = target == null ? null : target.parent as RectTransform;
+        if (target == null || parentRect == null)
+        {
+            return;
+        }
+
+        Vector2 localPointer;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, eventData.position, eventData.pressEventCamera, out localPointer))
+        {
+            pointerOffset = target.anchoredPosition - localPointer;
+        }
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (target == null || parentRect == null)
+        {
+            return;
+        }
+
+        Vector2 localPointer;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRect, eventData.position, eventData.pressEventCamera, out localPointer))
+        {
+            return;
+        }
+
+        target.anchoredPosition = ClampToParent(localPointer + pointerOffset);
+    }
+
+    private Vector2 ClampToParent(Vector2 value)
+    {
+        Rect parent = parentRect.rect;
+        Vector2 size = target.rect.size;
+        Vector2 pivot = target.pivot;
+        Vector2 anchorReference = new Vector2(
+            Mathf.Lerp(parent.xMin, parent.xMax, (target.anchorMin.x + target.anchorMax.x) * 0.5f),
+            Mathf.Lerp(parent.yMin, parent.yMax, (target.anchorMin.y + target.anchorMax.y) * 0.5f));
+        float minX = parent.xMin - anchorReference.x + size.x * pivot.x;
+        float maxX = parent.xMax - anchorReference.x - size.x * (1f - pivot.x);
+        float minY = parent.yMin - anchorReference.y + size.y * pivot.y;
+        float maxY = parent.yMax - anchorReference.y - size.y * (1f - pivot.y);
+
+        if (minX > maxX)
+        {
+            minX = maxX = 0f;
+        }
+
+        if (minY > maxY)
+        {
+            minY = maxY = 0f;
+        }
+
+        return new Vector2(Mathf.Clamp(value.x, minX, maxX), Mathf.Clamp(value.y, minY, maxY));
+    }
 }
 
 public class GalHistoryLine
@@ -170,6 +247,7 @@ public class GalTemplateRuntime : MonoBehaviour
     private const string SaveFolderName = "GalTemplate";
     private const int SaveSlotCount = 6;
     private const int QuickSaveSlot = 1;
+    private static readonly string[] CharacterImportExtensions = { ".png", ".jpg", ".jpeg" };
 
     private static GalTemplateRuntime instance;
 
@@ -177,6 +255,7 @@ public class GalTemplateRuntime : MonoBehaviour
     {
         None,
         Settings,
+        CharacterSettings,
         SaveLoad,
         History,
         PortraitDebug
@@ -305,8 +384,10 @@ public class GalTemplateRuntime : MonoBehaviour
     private Text settingsReloadButtonLabel;
     private Text settingsDeleteButtonLabel;
     private Text settingsDebugButtonLabel;
+    private Text settingsCharacterButtonLabel;
     private Text settingsExitButtonLabel;
     private Button settingsSavePanelButton;
+    private Button settingsCharacterButton;
     private Toggle fullscreenToggle;
     private Toggle skipUnreadToggle;
     private Slider textSpeedSlider;
@@ -314,6 +395,46 @@ public class GalTemplateRuntime : MonoBehaviour
     private Slider volumeSlider;
     private Slider fbxCameraHeightSlider;
     private Slider cabinMoodSlider;
+    private GameObject characterSettingsRoot;
+    private RectTransform characterSettingsPanelRect;
+    private GameObject characterPositionPage;
+    private GameObject characterImagePage;
+    private Text characterSettingsTitleText;
+    private Text characterDragHintText;
+    private Text characterPositionTabLabel;
+    private Text characterImageTabLabel;
+    private Text characterImageButtonLabel;
+    private Text characterViewportXLabel;
+    private Text characterViewportYLabel;
+    private Text characterViewportDepthLabel;
+    private Text characterScreenHeightLabel;
+    private Text characterPixelSizeLabel;
+    private Text characterMoodBlendLabel;
+    private Text characterViewportXValueText;
+    private Text characterViewportYValueText;
+    private Text characterViewportDepthValueText;
+    private Text characterScreenHeightValueText;
+    private Text characterPixelSizeValueText;
+    private Text characterMoodBlendValueText;
+    private Text characterImportPathLabel;
+    private Text characterImportButtonLabel;
+    private Text characterOpenImportFolderButtonLabel;
+    private Text characterRefreshImagesButtonLabel;
+    private Text characterImportDirectoryText;
+    private Text characterResetPanelButtonLabel;
+    private Text characterSettingsBackButtonLabel;
+    private Text characterSettingsExitButtonLabel;
+    private Button characterPositionTabButton;
+    private Button characterImageTabButton;
+    private Button characterSettingsBackButton;
+    private InputField characterImportPathInput;
+    private Slider characterViewportXSlider;
+    private Slider characterViewportYSlider;
+    private Slider characterViewportDepthSlider;
+    private Slider characterScreenHeightSlider;
+    private Slider characterPixelSizeSlider;
+    private Slider characterMoodBlendSlider;
+    private bool characterSettingsShowingImagePage;
     private GameObject portraitDebugRoot;
     private Text portraitDebugTitleText;
     private Text portraitDebugSlotLabel;
@@ -1766,6 +1887,11 @@ public class GalTemplateRuntime : MonoBehaviour
         {
             portraitDebugBackButtonLabel.transform.parent.gameObject.SetActive(canReturn && currentOverlayPage == GalOverlayPage.PortraitDebug);
         }
+
+        if (characterSettingsBackButton != null)
+        {
+            characterSettingsBackButton.gameObject.SetActive(canReturn && currentOverlayPage == GalOverlayPage.CharacterSettings);
+        }
     }
 
     private void CloseOverlayPages(bool includeSettings = true)
@@ -1790,6 +1916,11 @@ public class GalTemplateRuntime : MonoBehaviour
         if (portraitDebugRoot != null)
         {
             portraitDebugRoot.SetActive(false);
+        }
+
+        if (characterSettingsRoot != null)
+        {
+            characterSettingsRoot.SetActive(false);
         }
 
         currentOverlayPage = GalOverlayPage.None;
@@ -2266,7 +2397,9 @@ public class GalTemplateRuntime : MonoBehaviour
         SetText(settingsReloadButtonLabel, T("ui.settings.reload_text", "重载文案"));
         SetText(settingsDeleteButtonLabel, T("ui.settings.delete_save", "删除存档"));
         SetText(settingsDebugButtonLabel, T("ui.settings.portrait_debug", "立绘调试"));
+        SetText(settingsCharacterButtonLabel, T("ui.settings.character", "角色配置"));
         SetText(settingsExitButtonLabel, T("ui.common.exit", "退出"));
+        RefreshCharacterSettingsLabels();
         RefreshPortraitDebugLabels();
         RefreshExternalSceneHudLabels();
 
@@ -2288,6 +2421,28 @@ public class GalTemplateRuntime : MonoBehaviour
         if (target != null)
         {
             target.text = value;
+        }
+    }
+
+    private static void SetInputPlaceholder(InputField target, string value)
+    {
+        if (target != null && target.placeholder is Text placeholderText)
+        {
+            placeholderText.text = value;
+        }
+    }
+
+    private static void SetButtonVisual(Button button, bool selected)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        Image image = button.targetGraphic as Image;
+        if (image != null)
+        {
+            image.color = selected ? new Color(0.82f, 0.9f, 0.74f, 1f) : new Color(0.98f, 0.96f, 0.88f, 0.96f);
         }
     }
 
@@ -2511,6 +2666,7 @@ public class GalTemplateRuntime : MonoBehaviour
         BuildHistory(canvasObject.transform);
         BuildSaveLoadPanel(canvasObject.transform);
         BuildSettings(canvasObject.transform);
+        BuildCharacterSettings(canvasObject.transform);
         BuildPortraitDebug(canvasObject.transform);
     }
 
@@ -3134,6 +3290,7 @@ public class GalTemplateRuntime : MonoBehaviour
         Button reloadTextButton = CreateSettingsButton(panel.transform, T("ui.settings.reload_text", "重载文案"), new Vector2(750f, -400f), new Vector2(160f, 50f), ReloadStoryFilesInPlace, out settingsReloadButtonLabel);
         Button deleteButton = CreateSettingsButton(panel.transform, T("ui.settings.delete_save", "删除存档"), new Vector2(575f, -460f), new Vector2(160f, 50f), DeleteSave, out settingsDeleteButtonLabel);
         Button debugButton = CreateSettingsButton(panel.transform, T("ui.settings.portrait_debug", "立绘调试"), new Vector2(750f, -460f), new Vector2(160f, 50f), ShowPortraitDebugFromSettings, out settingsDebugButtonLabel);
+        settingsCharacterButton = CreateSettingsButton(panel.transform, T("ui.settings.character", "角色配置"), new Vector2(662f, -520f), new Vector2(335f, 50f), ShowCharacterSettingsFromSettings, out settingsCharacterButtonLabel);
 
         Button closeButton = CreateButton(panel.transform, T("ui.common.exit", "退出"), ExitOverlayPages, out settingsExitButtonLabel);
         RectTransform closeRect = closeButton.GetComponent<RectTransform>();
@@ -3144,6 +3301,155 @@ public class GalTemplateRuntime : MonoBehaviour
         closeRect.anchoredPosition = new Vector2(-38f, 28f);
 
         settingsRoot.SetActive(false);
+    }
+
+    private void BuildCharacterSettings(Transform parent)
+    {
+        characterSettingsRoot = CreateUiObject("Character Settings Overlay", parent);
+        Stretch(characterSettingsRoot.GetComponent<RectTransform>());
+        Image overlay = characterSettingsRoot.AddComponent<Image>();
+        overlay.color = new Color(0f, 0f, 0f, 0.16f);
+
+        GameObject panel = CreateUiObject("Character Settings Panel", characterSettingsRoot.transform);
+        characterSettingsPanelRect = panel.GetComponent<RectTransform>();
+        characterSettingsPanelRect.anchorMin = new Vector2(1f, 0.5f);
+        characterSettingsPanelRect.anchorMax = new Vector2(1f, 0.5f);
+        characterSettingsPanelRect.pivot = new Vector2(1f, 0.5f);
+        characterSettingsPanelRect.sizeDelta = new Vector2(860f, 640f);
+        characterSettingsPanelRect.anchoredPosition = new Vector2(-36f, 0f);
+        Image panelImage = panel.AddComponent<Image>();
+        panelImage.color = new Color(0.97f, 0.96f, 0.92f, 0.98f);
+
+        GameObject dragHandle = CreateUiObject("Character Settings Drag Handle", panel.transform);
+        RectTransform dragRect = dragHandle.GetComponent<RectTransform>();
+        dragRect.anchorMin = new Vector2(0f, 1f);
+        dragRect.anchorMax = new Vector2(1f, 1f);
+        dragRect.pivot = new Vector2(0.5f, 1f);
+        dragRect.offsetMin = new Vector2(0f, -82f);
+        dragRect.offsetMax = new Vector2(0f, 0f);
+        Image dragImage = dragHandle.AddComponent<Image>();
+        dragImage.color = new Color(0.15f, 0.14f, 0.12f, 0.08f);
+        GalDraggablePanel draggablePanel = dragHandle.AddComponent<GalDraggablePanel>();
+        draggablePanel.target = characterSettingsPanelRect;
+
+        characterSettingsTitleText = CreateText(panel.transform, T("ui.character.title", "角色配置"), 34, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.08f, 0.08f, 0.08f, 1f));
+        RectTransform titleRect = characterSettingsTitleText.GetComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0f, 1f);
+        titleRect.anchorMax = new Vector2(1f, 1f);
+        titleRect.pivot = new Vector2(0.5f, 1f);
+        titleRect.offsetMin = new Vector2(38f, -64f);
+        titleRect.offsetMax = new Vector2(-260f, -18f);
+
+        characterDragHintText = CreateText(panel.transform, T("ui.character.drag_hint", "拖动顶部空白处移动面板"), 17, FontStyle.Normal, TextAnchor.MiddleRight, new Color(0.2f, 0.2f, 0.18f, 0.8f));
+        RectTransform hintRect = characterDragHintText.GetComponent<RectTransform>();
+        hintRect.anchorMin = new Vector2(1f, 1f);
+        hintRect.anchorMax = new Vector2(1f, 1f);
+        hintRect.pivot = new Vector2(1f, 1f);
+        hintRect.sizeDelta = new Vector2(310f, 36f);
+        hintRect.anchoredPosition = new Vector2(-34f, -24f);
+
+        characterPositionTabButton = CreateSettingsButton(panel.transform, T("ui.character.tab_position", "位置"), new Vector2(145f, -108f), new Vector2(180f, 42f), ShowCharacterPositionPage, out characterPositionTabLabel);
+        characterImageTabButton = CreateSettingsButton(panel.transform, T("ui.character.tab_images", "图片"), new Vector2(345f, -108f), new Vector2(180f, 42f), ShowCharacterImagePage, out characterImageTabLabel);
+        CreateSettingsButton(panel.transform, T("ui.character.reset_panel", "贴右显示"), new Vector2(665f, -108f), new Vector2(220f, 42f), ResetCharacterSettingsPanelPosition, out characterResetPanelButtonLabel);
+
+        characterPositionPage = CreateUiObject("Character Position Page", panel.transform);
+        Stretch(characterPositionPage.GetComponent<RectTransform>());
+
+        characterViewportXSlider = CreateSettingsSlider(characterPositionPage.transform, T("ui.character.viewport_x", "横向位置"), new Vector2(245f, -190f), GalFbxSceneController.MinCharacterViewportX, GalFbxSceneController.MaxCharacterViewportX, settings.fbxCharacterViewportX, false, out characterViewportXLabel, out characterViewportXValueText);
+        characterViewportXSlider.onValueChanged.AddListener(delegate(float value)
+        {
+            settings.fbxCharacterViewportX = value;
+            characterViewportXValueText.text = FormatViewport(value);
+            ApplyCharacterSettings();
+        });
+
+        characterViewportYSlider = CreateSettingsSlider(characterPositionPage.transform, T("ui.character.viewport_y", "纵向位置"), new Vector2(245f, -275f), GalFbxSceneController.MinCharacterViewportY, GalFbxSceneController.MaxCharacterViewportY, settings.fbxCharacterViewportY, false, out characterViewportYLabel, out characterViewportYValueText);
+        characterViewportYSlider.onValueChanged.AddListener(delegate(float value)
+        {
+            settings.fbxCharacterViewportY = value;
+            characterViewportYValueText.text = FormatViewport(value);
+            ApplyCharacterSettings();
+        });
+
+        characterViewportDepthSlider = CreateSettingsSlider(characterPositionPage.transform, T("ui.character.depth", "前后距离"), new Vector2(245f, -360f), GalFbxSceneController.MinCharacterViewportDepth, GalFbxSceneController.MaxCharacterViewportDepth, settings.fbxCharacterViewportDepth, false, out characterViewportDepthLabel, out characterViewportDepthValueText);
+        characterViewportDepthSlider.onValueChanged.AddListener(delegate(float value)
+        {
+            settings.fbxCharacterViewportDepth = value;
+            characterViewportDepthValueText.text = FormatMeters(value);
+            ApplyCharacterSettings();
+        });
+
+        characterScreenHeightSlider = CreateSettingsSlider(characterPositionPage.transform, T("ui.character.size", "显示大小"), new Vector2(645f, -190f), GalFbxSceneController.MinCharacterScreenHeight, GalFbxSceneController.MaxCharacterScreenHeight, settings.fbxCharacterScreenHeight, false, out characterScreenHeightLabel, out characterScreenHeightValueText);
+        characterScreenHeightSlider.onValueChanged.AddListener(delegate(float value)
+        {
+            settings.fbxCharacterScreenHeight = value;
+            characterScreenHeightValueText.text = FormatScalePercent(value);
+            ApplyCharacterSettings();
+        });
+
+        characterPixelSizeSlider = CreateSettingsSlider(characterPositionPage.transform, T("ui.character.pixel_size", "像素尺寸"), new Vector2(645f, -275f), GalFbxSceneController.MinCharacterPixelSize, GalFbxSceneController.MaxCharacterPixelSize, settings.fbxCharacterPixelSize, true, out characterPixelSizeLabel, out characterPixelSizeValueText);
+        characterPixelSizeSlider.onValueChanged.AddListener(delegate(float value)
+        {
+            settings.fbxCharacterPixelSize = Mathf.Round(value);
+            characterPixelSizeValueText.text = FormatPixels(settings.fbxCharacterPixelSize);
+            ApplyCharacterSettings();
+        });
+
+        characterMoodBlendSlider = CreateSettingsSlider(characterPositionPage.transform, T("ui.character.mood_blend", "融合程度"), new Vector2(645f, -360f), 0f, 1f, settings.fbxCharacterMoodBlend, false, out characterMoodBlendLabel, out characterMoodBlendValueText);
+        characterMoodBlendSlider.onValueChanged.AddListener(delegate(float value)
+        {
+            settings.fbxCharacterMoodBlend = value;
+            characterMoodBlendValueText.text = FormatPercent(value);
+            ApplyCharacterSettings();
+        });
+
+        characterImagePage = CreateUiObject("Character Image Page", panel.transform);
+        Stretch(characterImagePage.GetComponent<RectTransform>());
+
+        CreateSettingsButton(characterImagePage.transform, GetCharacterImageButtonText(), new Vector2(430f, -190f), new Vector2(760f, 52f), CycleCharacterImageId, out characterImageButtonLabel);
+
+        characterImportPathLabel = CreateText(characterImagePage.transform, T("ui.character.import_path", "本地图片路径"), 22, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.1f, 0.1f, 0.1f, 1f));
+        RectTransform importPathLabelRect = characterImportPathLabel.GetComponent<RectTransform>();
+        importPathLabelRect.anchorMin = new Vector2(0f, 1f);
+        importPathLabelRect.anchorMax = new Vector2(0f, 1f);
+        importPathLabelRect.pivot = new Vector2(0f, 0.5f);
+        importPathLabelRect.sizeDelta = new Vector2(760f, 42f);
+        importPathLabelRect.anchoredPosition = new Vector2(50f, -260f);
+
+        characterImportPathInput = CreateInputField(characterImagePage.transform, T("ui.character.import_path_placeholder", "粘贴 png / jpg / jpeg 文件路径"), new Vector2(430f, -315f), new Vector2(760f, 46f));
+
+        CreateSettingsButton(characterImagePage.transform, T("ui.character.import_from_path", "导入路径"), new Vector2(205f, -390f), new Vector2(250f, 50f), ImportCharacterImageFromPath, out characterImportButtonLabel);
+        CreateSettingsButton(characterImagePage.transform, T("ui.character.open_import_folder", "打开导入目录"), new Vector2(470f, -390f), new Vector2(250f, 50f), OpenCharacterImportFolder, out characterOpenImportFolderButtonLabel);
+        CreateSettingsButton(characterImagePage.transform, T("ui.character.refresh_images", "刷新列表"), new Vector2(700f, -390f), new Vector2(190f, 50f), RefreshCharacterImageList, out characterRefreshImagesButtonLabel);
+
+        characterImportDirectoryText = CreateText(characterImagePage.transform, string.Empty, 18, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.12f, 0.12f, 0.1f, 0.85f));
+        RectTransform directoryRect = characterImportDirectoryText.GetComponent<RectTransform>();
+        directoryRect.anchorMin = new Vector2(0f, 1f);
+        directoryRect.anchorMax = new Vector2(0f, 1f);
+        directoryRect.pivot = new Vector2(0f, 1f);
+        directoryRect.sizeDelta = new Vector2(760f, 110f);
+        directoryRect.anchoredPosition = new Vector2(50f, -450f);
+
+        Button backButton = CreateButton(panel.transform, T("ui.common.back", "返回"), ReturnToPreviousOverlayPage, out characterSettingsBackButtonLabel);
+        characterSettingsBackButton = backButton;
+        RectTransform backRect = backButton.GetComponent<RectTransform>();
+        backRect.anchorMin = new Vector2(1f, 0f);
+        backRect.anchorMax = new Vector2(1f, 0f);
+        backRect.pivot = new Vector2(1f, 0f);
+        backRect.sizeDelta = new Vector2(140f, 50f);
+        backRect.anchoredPosition = new Vector2(-196f, 28f);
+
+        Button exitButton = CreateButton(panel.transform, T("ui.common.exit", "退出"), ExitOverlayPages, out characterSettingsExitButtonLabel);
+        RectTransform exitRect = exitButton.GetComponent<RectTransform>();
+        exitRect.anchorMin = new Vector2(1f, 0f);
+        exitRect.anchorMax = new Vector2(1f, 0f);
+        exitRect.pivot = new Vector2(1f, 0f);
+        exitRect.sizeDelta = new Vector2(140f, 50f);
+        exitRect.anchoredPosition = new Vector2(-38f, 28f);
+
+        ShowCharacterSettingsPage(false);
+        RefreshCharacterSettingsPanel();
+        characterSettingsRoot.SetActive(false);
     }
 
     private void BuildPortraitDebug(Transform parent)
@@ -3279,6 +3585,74 @@ public class GalTemplateRuntime : MonoBehaviour
         RefreshOverlayNavigationButtons();
     }
 
+    private void ShowCharacterSettingsFromSettings()
+    {
+        ShowCharacterSettings(true);
+    }
+
+    private void ShowCharacterSettings()
+    {
+        ShowCharacterSettings(false);
+    }
+
+    private void ShowCharacterSettings(bool returnToSettings)
+    {
+        if (characterSettingsRoot == null)
+        {
+            return;
+        }
+
+        previousOverlayPage = returnToSettings ? GalOverlayPage.Settings : GalOverlayPage.None;
+        CloseOverlayPages(true);
+        currentOverlayPage = GalOverlayPage.CharacterSettings;
+        characterSettingsRoot.SetActive(true);
+        RefreshCharacterSettingsPanel();
+        RefreshOverlayNavigationButtons();
+    }
+
+    private void ShowCharacterPositionPage()
+    {
+        ShowCharacterSettingsPage(false);
+    }
+
+    private void ShowCharacterImagePage()
+    {
+        ShowCharacterSettingsPage(true);
+    }
+
+    private void ShowCharacterSettingsPage(bool imagePage)
+    {
+        characterSettingsShowingImagePage = imagePage;
+        if (characterPositionPage != null)
+        {
+            characterPositionPage.SetActive(!imagePage);
+        }
+
+        if (characterImagePage != null)
+        {
+            characterImagePage.SetActive(imagePage);
+        }
+
+        RefreshCharacterTabState();
+    }
+
+    private void RefreshCharacterTabState()
+    {
+        SetButtonVisual(characterPositionTabButton, !characterSettingsShowingImagePage);
+        SetButtonVisual(characterImageTabButton, characterSettingsShowingImagePage);
+    }
+
+    private void ResetCharacterSettingsPanelPosition()
+    {
+        if (characterSettingsPanelRect != null)
+        {
+            characterSettingsPanelRect.anchorMin = new Vector2(1f, 0.5f);
+            characterSettingsPanelRect.anchorMax = new Vector2(1f, 0.5f);
+            characterSettingsPanelRect.pivot = new Vector2(1f, 0.5f);
+            characterSettingsPanelRect.anchoredPosition = new Vector2(-36f, 0f);
+        }
+    }
+
     private void HideSettings()
     {
         ExitOverlayPages();
@@ -3322,6 +3696,273 @@ public class GalTemplateRuntime : MonoBehaviour
         portraitDebugRoot.SetActive(true);
         RefreshPortraitDebugLabels();
         RefreshOverlayNavigationButtons();
+    }
+
+    private void RefreshCharacterSettingsPanel()
+    {
+        if (characterSettingsRoot == null)
+        {
+            return;
+        }
+
+        SetText(characterSettingsTitleText, T("ui.character.title", "角色配置"));
+        SetText(characterDragHintText, T("ui.character.drag_hint", "拖动顶部空白处移动面板"));
+        SetText(characterPositionTabLabel, T("ui.character.tab_position", "位置"));
+        SetText(characterImageTabLabel, T("ui.character.tab_images", "图片"));
+        SetText(characterImageButtonLabel, GetCharacterImageButtonText());
+        SetText(characterViewportXLabel, T("ui.character.viewport_x", "横向位置"));
+        SetText(characterViewportYLabel, T("ui.character.viewport_y", "纵向位置"));
+        SetText(characterViewportDepthLabel, T("ui.character.depth", "前后距离"));
+        SetText(characterScreenHeightLabel, T("ui.character.size", "显示大小"));
+        SetText(characterPixelSizeLabel, T("ui.character.pixel_size", "像素尺寸"));
+        SetText(characterMoodBlendLabel, T("ui.character.mood_blend", "融合程度"));
+        SetText(characterImportPathLabel, T("ui.character.import_path", "本地图片路径"));
+        SetInputPlaceholder(characterImportPathInput, T("ui.character.import_path_placeholder", "粘贴 png / jpg / jpeg 文件路径"));
+        SetText(characterImportButtonLabel, T("ui.character.import_from_path", "导入路径"));
+        SetText(characterOpenImportFolderButtonLabel, T("ui.character.open_import_folder", "打开导入目录"));
+        SetText(characterRefreshImagesButtonLabel, T("ui.character.refresh_images", "刷新列表"));
+        SetText(characterResetPanelButtonLabel, T("ui.character.reset_panel", "贴右显示"));
+        SetText(characterSettingsBackButtonLabel, T("ui.common.back", "返回"));
+        SetText(characterSettingsExitButtonLabel, T("ui.common.exit", "退出"));
+
+        characterViewportXSlider.SetValueWithoutNotify(settings.fbxCharacterViewportX);
+        characterViewportYSlider.SetValueWithoutNotify(settings.fbxCharacterViewportY);
+        characterViewportDepthSlider.SetValueWithoutNotify(settings.fbxCharacterViewportDepth);
+        characterScreenHeightSlider.SetValueWithoutNotify(settings.fbxCharacterScreenHeight);
+        characterPixelSizeSlider.SetValueWithoutNotify(settings.fbxCharacterPixelSize);
+        characterMoodBlendSlider.SetValueWithoutNotify(settings.fbxCharacterMoodBlend);
+
+        characterViewportXValueText.text = FormatViewport(settings.fbxCharacterViewportX);
+        characterViewportYValueText.text = FormatViewport(settings.fbxCharacterViewportY);
+        characterViewportDepthValueText.text = FormatMeters(settings.fbxCharacterViewportDepth);
+        characterScreenHeightValueText.text = FormatScalePercent(settings.fbxCharacterScreenHeight);
+        characterPixelSizeValueText.text = FormatPixels(settings.fbxCharacterPixelSize);
+        characterMoodBlendValueText.text = FormatPercent(settings.fbxCharacterMoodBlend);
+        SetText(characterImportDirectoryText, string.Format(T("ui.character.import_directory", "导入目录：{0}\n支持格式：png / jpg / jpeg\n列表数量：{1}"), GalFbxSceneController.GetLocalCharacterImportDirectory(), GetCharacterImageIds().Length));
+        RefreshCharacterTabState();
+    }
+
+    private void RefreshCharacterSettingsLabels()
+    {
+        SetText(characterSettingsTitleText, T("ui.character.title", "角色配置"));
+        SetText(characterDragHintText, T("ui.character.drag_hint", "拖动顶部空白处移动面板"));
+        SetText(characterPositionTabLabel, T("ui.character.tab_position", "位置"));
+        SetText(characterImageTabLabel, T("ui.character.tab_images", "图片"));
+        SetText(characterImageButtonLabel, GetCharacterImageButtonText());
+        SetText(characterViewportXLabel, T("ui.character.viewport_x", "横向位置"));
+        SetText(characterViewportYLabel, T("ui.character.viewport_y", "纵向位置"));
+        SetText(characterViewportDepthLabel, T("ui.character.depth", "前后距离"));
+        SetText(characterScreenHeightLabel, T("ui.character.size", "显示大小"));
+        SetText(characterPixelSizeLabel, T("ui.character.pixel_size", "像素尺寸"));
+        SetText(characterMoodBlendLabel, T("ui.character.mood_blend", "融合程度"));
+        SetText(characterImportPathLabel, T("ui.character.import_path", "本地图片路径"));
+        SetInputPlaceholder(characterImportPathInput, T("ui.character.import_path_placeholder", "粘贴 png / jpg / jpeg 文件路径"));
+        SetText(characterImportButtonLabel, T("ui.character.import_from_path", "导入路径"));
+        SetText(characterOpenImportFolderButtonLabel, T("ui.character.open_import_folder", "打开导入目录"));
+        SetText(characterRefreshImagesButtonLabel, T("ui.character.refresh_images", "刷新列表"));
+        SetText(characterResetPanelButtonLabel, T("ui.character.reset_panel", "贴右显示"));
+        SetText(characterSettingsBackButtonLabel, T("ui.common.back", "返回"));
+        SetText(characterSettingsExitButtonLabel, T("ui.common.exit", "退出"));
+    }
+
+    private void ApplyCharacterSettings()
+    {
+        NormalizeCharacterSettings();
+        GalFbxSceneController.Instance.SetCharacterSettings(
+            settings.fbxCharacterImageId,
+            settings.fbxCharacterViewportX,
+            settings.fbxCharacterViewportY,
+            settings.fbxCharacterViewportDepth,
+            settings.fbxCharacterScreenHeight,
+            settings.fbxCharacterPixelSize,
+            settings.fbxCharacterMoodBlend);
+        SaveSettings();
+    }
+
+    private void ImportCharacterImageFromPath()
+    {
+        if (characterImportPathInput == null)
+        {
+            return;
+        }
+
+        string sourcePath = CleanLocalPath(characterImportPathInput.text);
+        if (string.IsNullOrEmpty(sourcePath) || !File.Exists(sourcePath))
+        {
+            ShowToast(T("ui.toast.character_import_missing", "没有找到这个图片文件。"));
+            return;
+        }
+
+        if (!IsSupportedCharacterImagePath(sourcePath))
+        {
+            ShowToast(T("ui.toast.character_import_format", "仅支持 png / jpg / jpeg。"));
+            return;
+        }
+
+        try
+        {
+            string importDirectory = GalFbxSceneController.GetLocalCharacterImportDirectory();
+            Directory.CreateDirectory(importDirectory);
+            string targetName = GetUniqueCharacterImportFileName(importDirectory, Path.GetFileName(sourcePath));
+            string targetPath = Path.Combine(importDirectory, targetName);
+            File.Copy(sourcePath, targetPath, false);
+
+            settings.fbxCharacterImageId = GalFbxSceneController.LocalCharacterImagePrefix + targetName;
+            ApplyCharacterSettings();
+            RefreshCharacterSettingsPanel();
+            ShowToast(string.Format(T("ui.toast.character_imported", "已导入角色图片：{0}"), targetName));
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("GAL character import failed: " + ex.Message);
+            ShowToast(T("ui.toast.character_import_failed", "角色图片导入失败。"));
+        }
+    }
+
+    private void OpenCharacterImportFolder()
+    {
+        string importDirectory = GalFbxSceneController.GetLocalCharacterImportDirectory();
+        Directory.CreateDirectory(importDirectory);
+        Application.OpenURL("file:///" + importDirectory.Replace('\\', '/'));
+        ShowToast(string.Format(T("ui.toast.character_import_folder", "导入目录：{0}"), importDirectory));
+    }
+
+    private void RefreshCharacterImageList()
+    {
+        RefreshCharacterSettingsPanel();
+        ShowToast(string.Format(T("ui.toast.character_images_refreshed", "角色图片列表已刷新：{0} 项"), GetCharacterImageIds().Length));
+    }
+
+    private void CycleCharacterImageId()
+    {
+        string[] imageIds = GetCharacterImageIds();
+        if (imageIds.Length == 0)
+        {
+            return;
+        }
+
+        settings.fbxCharacterImageId = NextValue(settings.fbxCharacterImageId, imageIds);
+        ApplyCharacterSettings();
+        RefreshCharacterSettingsPanel();
+        ShowToast(string.Format(T("ui.toast.character_image_changed", "角色图像：{0}"), settings.fbxCharacterImageId));
+    }
+
+    private string GetCharacterImageButtonText()
+    {
+        return string.Format(T("ui.character.image_id", "图像ID：{0}"), GetCharacterImageDisplayName(settings.fbxCharacterImageId));
+    }
+
+    private string[] GetCharacterImageIds()
+    {
+        Texture2D[] textures = Resources.LoadAll<Texture2D>("Characters");
+        List<string> ids = new List<string>();
+        if (textures != null)
+        {
+            for (int i = 0; i < textures.Length; i++)
+            {
+                Texture2D texture = textures[i];
+                if (texture != null && !string.IsNullOrEmpty(texture.name))
+                {
+                    ids.Add(texture.name);
+                }
+            }
+        }
+
+        AddLocalCharacterImageIds(ids);
+
+        if (!ids.Contains(GalFbxSceneController.DefaultCharacterImageId))
+        {
+            ids.Insert(0, GalFbxSceneController.DefaultCharacterImageId);
+        }
+
+        return ids.Count == 0 ? new[] { GalFbxSceneController.DefaultCharacterImageId } : ids.ToArray();
+    }
+
+    private void AddLocalCharacterImageIds(List<string> ids)
+    {
+        string importDirectory = GalFbxSceneController.GetLocalCharacterImportDirectory();
+        if (!Directory.Exists(importDirectory))
+        {
+            return;
+        }
+
+        string[] files = Directory.GetFiles(importDirectory);
+        Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < files.Length; i++)
+        {
+            string path = files[i];
+            if (!IsSupportedCharacterImagePath(path))
+            {
+                continue;
+            }
+
+            string id = GalFbxSceneController.LocalCharacterImagePrefix + Path.GetFileName(path);
+            if (!ids.Contains(id))
+            {
+                ids.Add(id);
+            }
+        }
+    }
+
+    private static string GetCharacterImageDisplayName(string imageId)
+    {
+        if (string.IsNullOrWhiteSpace(imageId))
+        {
+            return GalFbxSceneController.DefaultCharacterImageId;
+        }
+
+        if (imageId.StartsWith(GalFbxSceneController.LocalCharacterImagePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return imageId;
+        }
+
+        return imageId;
+    }
+
+    private static string CleanLocalPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        string cleaned = path.Trim();
+        if (cleaned.Length >= 2 && cleaned[0] == '"' && cleaned[cleaned.Length - 1] == '"')
+        {
+            cleaned = cleaned.Substring(1, cleaned.Length - 2);
+        }
+
+        return cleaned;
+    }
+
+    private static bool IsSupportedCharacterImagePath(string path)
+    {
+        string extension = Path.GetExtension(path);
+        for (int i = 0; i < CharacterImportExtensions.Length; i++)
+        {
+            if (string.Equals(extension, CharacterImportExtensions[i], StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string GetUniqueCharacterImportFileName(string directory, string fileName)
+    {
+        string cleanFileName = Path.GetFileName(fileName);
+        string name = Path.GetFileNameWithoutExtension(cleanFileName);
+        string extension = Path.GetExtension(cleanFileName);
+        string candidate = cleanFileName;
+        int index = 2;
+        while (File.Exists(Path.Combine(directory, candidate)))
+        {
+            candidate = name + "_" + index.ToString("00") + extension;
+            index++;
+        }
+
+        return candidate;
     }
 
     private void CycleDebugPortraitSlot()
@@ -3531,10 +4172,18 @@ public class GalTemplateRuntime : MonoBehaviour
         settings.masterVolume = PlayerPrefs.GetFloat("GalTemplate.MasterVolume", settings.masterVolume);
         settings.fbxCameraHeight = PlayerPrefs.GetFloat("GalTemplate.FbxCameraHeight", settings.fbxCameraHeight);
         settings.cabinMoodIntensity = PlayerPrefs.GetFloat("GalTemplate.CabinMoodIntensity", settings.cabinMoodIntensity);
+        settings.fbxCharacterImageId = PlayerPrefs.GetString("GalTemplate.FbxCharacterImageId", settings.fbxCharacterImageId);
+        settings.fbxCharacterViewportX = PlayerPrefs.GetFloat("GalTemplate.FbxCharacterViewportX", settings.fbxCharacterViewportX);
+        settings.fbxCharacterViewportY = PlayerPrefs.GetFloat("GalTemplate.FbxCharacterViewportY", settings.fbxCharacterViewportY);
+        settings.fbxCharacterViewportDepth = PlayerPrefs.GetFloat("GalTemplate.FbxCharacterViewportDepth", settings.fbxCharacterViewportDepth);
+        settings.fbxCharacterScreenHeight = PlayerPrefs.GetFloat("GalTemplate.FbxCharacterScreenHeight", settings.fbxCharacterScreenHeight);
+        settings.fbxCharacterPixelSize = PlayerPrefs.GetFloat("GalTemplate.FbxCharacterPixelSize", settings.fbxCharacterPixelSize);
+        settings.fbxCharacterMoodBlend = PlayerPrefs.GetFloat("GalTemplate.FbxCharacterMoodBlend", settings.fbxCharacterMoodBlend);
         settings.fullscreen = PlayerPrefs.GetInt("GalTemplate.Fullscreen", settings.fullscreen ? 1 : 0) == 1;
         settings.skipUnreadText = PlayerPrefs.GetInt("GalTemplate.SkipUnreadText", settings.skipUnreadText ? 1 : 0) == 1;
         settings.language = PlayerPrefs.GetString("GalTemplate.Language", settings.language);
         settings.artProfile = PlayerPrefs.GetString("GalTemplate.ArtProfile", settings.artProfile);
+        NormalizeCharacterSettings();
     }
 
     private void SaveSettings()
@@ -3544,6 +4193,13 @@ public class GalTemplateRuntime : MonoBehaviour
         PlayerPrefs.SetFloat("GalTemplate.MasterVolume", settings.masterVolume);
         PlayerPrefs.SetFloat("GalTemplate.FbxCameraHeight", settings.fbxCameraHeight);
         PlayerPrefs.SetFloat("GalTemplate.CabinMoodIntensity", settings.cabinMoodIntensity);
+        PlayerPrefs.SetString("GalTemplate.FbxCharacterImageId", settings.fbxCharacterImageId);
+        PlayerPrefs.SetFloat("GalTemplate.FbxCharacterViewportX", settings.fbxCharacterViewportX);
+        PlayerPrefs.SetFloat("GalTemplate.FbxCharacterViewportY", settings.fbxCharacterViewportY);
+        PlayerPrefs.SetFloat("GalTemplate.FbxCharacterViewportDepth", settings.fbxCharacterViewportDepth);
+        PlayerPrefs.SetFloat("GalTemplate.FbxCharacterScreenHeight", settings.fbxCharacterScreenHeight);
+        PlayerPrefs.SetFloat("GalTemplate.FbxCharacterPixelSize", settings.fbxCharacterPixelSize);
+        PlayerPrefs.SetFloat("GalTemplate.FbxCharacterMoodBlend", settings.fbxCharacterMoodBlend);
         PlayerPrefs.SetInt("GalTemplate.Fullscreen", settings.fullscreen ? 1 : 0);
         PlayerPrefs.SetInt("GalTemplate.SkipUnreadText", settings.skipUnreadText ? 1 : 0);
         PlayerPrefs.SetString("GalTemplate.Language", settings.language);
@@ -3553,10 +4209,35 @@ public class GalTemplateRuntime : MonoBehaviour
 
     private void ApplySettings()
     {
+        NormalizeCharacterSettings();
         AudioListener.volume = Mathf.Clamp01(settings.masterVolume);
         Screen.fullScreen = settings.fullscreen;
-        GalFbxSceneController.Instance.SetCameraHeightOffset(settings.fbxCameraHeight);
-        GalFbxSceneController.Instance.SetMoodIntensity(settings.cabinMoodIntensity);
+        GalFbxSceneController controller = GalFbxSceneController.Instance;
+        controller.SetCameraHeightOffset(settings.fbxCameraHeight);
+        controller.SetMoodIntensity(settings.cabinMoodIntensity);
+        controller.SetCharacterSettings(
+            settings.fbxCharacterImageId,
+            settings.fbxCharacterViewportX,
+            settings.fbxCharacterViewportY,
+            settings.fbxCharacterViewportDepth,
+            settings.fbxCharacterScreenHeight,
+            settings.fbxCharacterPixelSize,
+            settings.fbxCharacterMoodBlend);
+    }
+
+    private void NormalizeCharacterSettings()
+    {
+        if (string.IsNullOrWhiteSpace(settings.fbxCharacterImageId))
+        {
+            settings.fbxCharacterImageId = GalFbxSceneController.DefaultCharacterImageId;
+        }
+
+        settings.fbxCharacterViewportX = Mathf.Clamp(settings.fbxCharacterViewportX, GalFbxSceneController.MinCharacterViewportX, GalFbxSceneController.MaxCharacterViewportX);
+        settings.fbxCharacterViewportY = Mathf.Clamp(settings.fbxCharacterViewportY, GalFbxSceneController.MinCharacterViewportY, GalFbxSceneController.MaxCharacterViewportY);
+        settings.fbxCharacterViewportDepth = Mathf.Clamp(settings.fbxCharacterViewportDepth, GalFbxSceneController.MinCharacterViewportDepth, GalFbxSceneController.MaxCharacterViewportDepth);
+        settings.fbxCharacterScreenHeight = Mathf.Clamp(settings.fbxCharacterScreenHeight, GalFbxSceneController.MinCharacterScreenHeight, GalFbxSceneController.MaxCharacterScreenHeight);
+        settings.fbxCharacterPixelSize = Mathf.Clamp(Mathf.Round(settings.fbxCharacterPixelSize), GalFbxSceneController.MinCharacterPixelSize, GalFbxSceneController.MaxCharacterPixelSize);
+        settings.fbxCharacterMoodBlend = Mathf.Clamp01(settings.fbxCharacterMoodBlend);
     }
 
     private static string FormatCameraHeight(float value)
@@ -3567,6 +4248,26 @@ public class GalTemplateRuntime : MonoBehaviour
     private static string FormatPercent(float value)
     {
         return Mathf.RoundToInt(Mathf.Clamp01(value) * 100f) + "%";
+    }
+
+    private static string FormatViewport(float value)
+    {
+        return value.ToString("0.000");
+    }
+
+    private static string FormatScalePercent(float value)
+    {
+        return Mathf.RoundToInt(Mathf.Clamp(value, GalFbxSceneController.MinCharacterScreenHeight, GalFbxSceneController.MaxCharacterScreenHeight) * 100f) + "%";
+    }
+
+    private static string FormatMeters(float value)
+    {
+        return value.ToString("0.00") + "m";
+    }
+
+    private static string FormatPixels(float value)
+    {
+        return Mathf.RoundToInt(Mathf.Max(1f, value)).ToString("0") + "px";
     }
 
     private void ShowToast(string message)
@@ -3630,6 +4331,51 @@ public class GalTemplateRuntime : MonoBehaviour
         uiText.horizontalOverflow = HorizontalWrapMode.Wrap;
         uiText.verticalOverflow = VerticalWrapMode.Truncate;
         return uiText;
+    }
+
+    private InputField CreateInputField(Transform parent, string placeholder, Vector2 anchoredPosition, Vector2 size)
+    {
+        GameObject inputObject = CreateUiObject("Input Field", parent);
+        RectTransform inputRect = inputObject.GetComponent<RectTransform>();
+        inputRect.anchorMin = new Vector2(0f, 1f);
+        inputRect.anchorMax = new Vector2(0f, 1f);
+        inputRect.pivot = new Vector2(0.5f, 0.5f);
+        inputRect.sizeDelta = size;
+        inputRect.anchoredPosition = anchoredPosition;
+
+        Image background = inputObject.AddComponent<Image>();
+        background.color = new Color(1f, 0.99f, 0.94f, 0.98f);
+
+        InputField inputField = inputObject.AddComponent<InputField>();
+        inputField.targetGraphic = background;
+        inputField.lineType = InputField.LineType.SingleLine;
+        inputField.characterLimit = 1024;
+        inputField.caretColor = new Color(0.08f, 0.08f, 0.08f, 1f);
+        inputField.selectionColor = new Color(0.45f, 0.62f, 0.5f, 0.35f);
+
+        Text textComponent = CreateText(inputObject.transform, string.Empty, 19, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.08f, 0.08f, 0.08f, 1f));
+        RectTransform textRect = textComponent.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(16f, 0f);
+        textRect.offsetMax = new Vector2(-16f, 0f);
+        textComponent.horizontalOverflow = HorizontalWrapMode.Overflow;
+        textComponent.verticalOverflow = VerticalWrapMode.Truncate;
+        textComponent.raycastTarget = false;
+
+        Text placeholderText = CreateText(inputObject.transform, placeholder, 18, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.35f, 0.35f, 0.3f, 0.55f));
+        RectTransform placeholderRect = placeholderText.GetComponent<RectTransform>();
+        placeholderRect.anchorMin = Vector2.zero;
+        placeholderRect.anchorMax = Vector2.one;
+        placeholderRect.offsetMin = new Vector2(16f, 0f);
+        placeholderRect.offsetMax = new Vector2(-16f, 0f);
+        placeholderText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        placeholderText.verticalOverflow = VerticalWrapMode.Truncate;
+        placeholderText.raycastTarget = false;
+
+        inputField.textComponent = textComponent;
+        inputField.placeholder = placeholderText;
+        return inputField;
     }
 
     private Button CreateButton(Transform parent, string label, UnityAction onClick, out Text labelText)
