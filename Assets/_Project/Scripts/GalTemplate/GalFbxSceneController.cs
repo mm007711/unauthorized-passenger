@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class GalFbxSceneController : MonoBehaviour
@@ -35,6 +36,17 @@ public class GalFbxSceneController : MonoBehaviour
     public const float MaxCharacterPixelSize = 64f;
     private const float CharacterDepthNearScale = 1.08f;
     private const float CharacterDepthFarScale = 0.92f;
+    private const float UnauthorizedPassengerHiddenSideOffset = -0.76f;
+    private const float UnauthorizedPassengerHiddenVerticalOffset = -0.04f;
+    private const float UnauthorizedPassengerPeekReveal = 0.13f;
+    private const float UnauthorizedPassengerRevealSpeed = 7.5f;
+    private const float UnauthorizedPassengerPeekSpeed = 2.7f;
+    private const float UnauthorizedPassengerFocusSpeed = 3.2f;
+    private const float UnauthorizedPassengerFocusPushDistance = 0.08f;
+    private const float UnauthorizedPassengerFocusLookStrength = 0.18f;
+    private const float UnauthorizedPassengerFocusFieldOfViewZoom = 1.5f;
+    private const float UnauthorizedPassengerClickPadding = 80f;
+    private const float UnauthorizedPassengerMinimumClickSize = 150f;
 
     private static readonly Color ClearAmbientLight = new Color(0.42f, 0.42f, 0.46f, 1f);
     private static readonly Color EerieAmbientLight = new Color(0.16f, 0.12f, 0.24f, 1f);
@@ -61,6 +73,8 @@ public class GalFbxSceneController : MonoBehaviour
     private Transform sceneCameraTransform;
     private Vector3 sceneCameraBasePosition;
     private Quaternion sceneCameraBaseRotation;
+    private float sceneCameraBaseFieldOfView;
+    private float sceneCameraBaseOrthographicSize;
     private Vector3 sceneCameraInputOffset;
     private Vector2 sceneCameraLookOffset;
     private Vector2 sceneCameraMouseLookOffset;
@@ -78,6 +92,14 @@ public class GalFbxSceneController : MonoBehaviour
     private float characterScreenHeight = DefaultCharacterScreenHeight;
     private float characterPixelSize = DefaultCharacterPixelSize;
     private float characterMoodBlend = DefaultCharacterMoodBlend;
+    private Vector3 sceneCharacterBasePosition;
+    private Vector3 sceneCharacterBaseScale = Vector3.one;
+    private Vector3 sceneCharacterAnchorRight = Vector3.right;
+    private Vector3 sceneCharacterAnchorUp = Vector3.up;
+    private bool unauthorizedPassengerRevealed;
+    private bool unauthorizedPassengerFocusRequested;
+    private float unauthorizedPassengerReveal;
+    private float unauthorizedPassengerFocus;
     private Canvas overlayCanvas;
     private Image blackImage;
     private bool isActive;
@@ -110,6 +132,8 @@ public class GalFbxSceneController : MonoBehaviour
         get { return instance != null && instance.isActive; }
     }
 
+    public event Action<string> CharacterDialogueRequested;
+
     public static string GetLocalCharacterImportDirectory()
     {
         return Path.Combine(Application.persistentDataPath, "GalTemplate", "Characters");
@@ -135,14 +159,29 @@ public class GalFbxSceneController : MonoBehaviour
     {
         string normalizedImageId = NormalizeCharacterImageId(imageId);
         bool imageChanged = normalizedImageId != characterImageId;
+        float nextViewportX = Mathf.Clamp(viewportX, MinCharacterViewportX, MaxCharacterViewportX);
+        float nextViewportY = Mathf.Clamp(viewportY, MinCharacterViewportY, MaxCharacterViewportY);
+        float nextViewportDepth = Mathf.Clamp(viewportDepth, MinCharacterViewportDepth, MaxCharacterViewportDepth);
+        float nextScreenHeight = Mathf.Clamp(screenHeight, MinCharacterScreenHeight, MaxCharacterScreenHeight);
+        float nextPixelSize = Mathf.Clamp(pixelSize, MinCharacterPixelSize, MaxCharacterPixelSize);
+        float nextMoodBlend = Mathf.Clamp01(moodBlend);
+        bool placementChanged =
+            !Mathf.Approximately(nextViewportX, characterViewportX) ||
+            !Mathf.Approximately(nextViewportY, characterViewportY) ||
+            !Mathf.Approximately(nextViewportDepth, characterViewportDepth) ||
+            !Mathf.Approximately(nextScreenHeight, characterScreenHeight);
+        bool materialChanged =
+            !Mathf.Approximately(nextPixelSize, characterPixelSize) ||
+            !Mathf.Approximately(nextMoodBlend, characterMoodBlend);
+
         characterImageId = normalizedImageId;
         characterTexturePath = GetCharacterTexturePath(characterImageId);
-        characterViewportX = Mathf.Clamp(viewportX, MinCharacterViewportX, MaxCharacterViewportX);
-        characterViewportY = Mathf.Clamp(viewportY, MinCharacterViewportY, MaxCharacterViewportY);
-        characterViewportDepth = Mathf.Clamp(viewportDepth, MinCharacterViewportDepth, MaxCharacterViewportDepth);
-        characterScreenHeight = Mathf.Clamp(screenHeight, MinCharacterScreenHeight, MaxCharacterScreenHeight);
-        characterPixelSize = Mathf.Clamp(pixelSize, MinCharacterPixelSize, MaxCharacterPixelSize);
-        characterMoodBlend = Mathf.Clamp01(moodBlend);
+        characterViewportX = nextViewportX;
+        characterViewportY = nextViewportY;
+        characterViewportDepth = nextViewportDepth;
+        characterScreenHeight = nextScreenHeight;
+        characterPixelSize = nextPixelSize;
+        characterMoodBlend = nextMoodBlend;
 
         if (sceneCharacterMaterial != null)
         {
@@ -162,10 +201,19 @@ public class GalFbxSceneController : MonoBehaviour
                     sceneCharacterTextureIsRuntime = isRuntimeTexture;
                     sceneCharacterMaterial.SetTexture("_MainTex", sceneCharacterTexture);
                 }
+
+                ResetUnauthorizedPassengerInteraction();
+            }
+            else if (placementChanged)
+            {
+                CancelUnauthorizedPassengerCameraFocus();
             }
 
             PositionSceneCharacter(sceneBounds, sceneCharacterTexture);
-            ApplyCharacterMoodSettings(Mathf.Clamp01(moodIntensity));
+            if (placementChanged || materialChanged)
+            {
+                ApplyCharacterMoodSettings(Mathf.Clamp01(moodIntensity));
+            }
         }
     }
 
@@ -259,6 +307,8 @@ public class GalFbxSceneController : MonoBehaviour
             sceneCameraTransform = sceneCamera.transform;
             sceneCameraBasePosition = sceneCameraTransform.position;
             sceneCameraBaseRotation = sceneCameraTransform.rotation;
+            sceneCameraBaseFieldOfView = sceneCamera.fieldOfView;
+            sceneCameraBaseOrthographicSize = sceneCamera.orthographicSize;
             sceneCameraInputOffset = Vector3.zero;
             sceneCameraLookOffset = Vector2.zero;
             sceneCameraMouseLookOffset = Vector2.zero;
@@ -266,6 +316,7 @@ public class GalFbxSceneController : MonoBehaviour
             sceneCameraMoveBlend = 0f;
             sceneCameraTurnLean = 0f;
             sceneCameraStepTime = 0f;
+            ResetUnauthorizedPassengerInteraction();
             sceneMoodEffect = sceneCamera.GetComponent<CabinMoodImageEffect>();
             if (sceneMoodEffect == null)
             {
@@ -501,17 +552,71 @@ public class GalFbxSceneController : MonoBehaviour
         float depthT = Mathf.InverseLerp(MinCharacterViewportDepth, MaxCharacterViewportDepth, depth);
         float easedDepthT = Mathf.SmoothStep(0f, 1f, depthT);
 
-        Vector3 worldPosition = sceneCamera.ViewportToWorldPoint(new Vector3(characterViewportX, characterViewportY, depth));
-        sceneCharacter.transform.position = worldPosition;
+        GetCharacterPlacementPose(out Vector3 placementPosition, out Quaternion placementRotation, out float placementFieldOfView, out float placementOrthographicSize);
+        Vector3 worldPosition = ViewportToWorldPointFromPose(
+            new Vector3(characterViewportX, characterViewportY, depth),
+            placementPosition,
+            placementRotation,
+            placementFieldOfView,
+            placementOrthographicSize);
 
         float viewHeightAtDepth = sceneCamera.orthographic
-            ? sceneCamera.orthographicSize * 2f
-            : 2f * depth * Mathf.Tan(sceneCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            ? placementOrthographicSize * 2f
+            : 2f * depth * Mathf.Tan(placementFieldOfView * 0.5f * Mathf.Deg2Rad);
         float depthScale = Mathf.Lerp(CharacterDepthNearScale, CharacterDepthFarScale, easedDepthT);
         float characterHeight = Mathf.Max(0.01f, viewHeightAtDepth * characterScreenHeight * depthScale);
         float aspect = Mathf.Clamp(texture.width / Mathf.Max(1f, (float)texture.height), 0.35f, 1.25f);
-        sceneCharacter.transform.localScale = new Vector3(characterHeight * aspect, characterHeight, 1f);
+        sceneCharacterBasePosition = worldPosition;
+        sceneCharacterBaseScale = new Vector3(characterHeight * aspect, characterHeight, 1f);
+        sceneCharacterAnchorRight = placementRotation * Vector3.right;
+        sceneCharacterAnchorUp = placementRotation * Vector3.up;
+        ApplyUnauthorizedPassengerPose();
         UpdateSceneCharacterBillboard();
+    }
+
+    private void GetCharacterPlacementPose(out Vector3 position, out Quaternion rotation, out float fieldOfView, out float orthographicSize)
+    {
+        position = sceneCameraTransform == null ? Vector3.zero : sceneCameraTransform.position;
+        rotation = sceneCameraTransform == null ? Quaternion.identity : sceneCameraTransform.rotation;
+        fieldOfView = sceneCameraBaseFieldOfView > 0f ? sceneCameraBaseFieldOfView : (sceneCamera == null ? 60f : sceneCamera.fieldOfView);
+        orthographicSize = sceneCameraBaseOrthographicSize > 0f ? sceneCameraBaseOrthographicSize : (sceneCamera == null ? 5f : sceneCamera.orthographicSize);
+
+        if (sceneCameraTransform == null)
+        {
+            return;
+        }
+
+        Vector2 totalLook = sceneCameraLookOffset + sceneCameraMouseLookOffset;
+        Quaternion bodyTurn = Quaternion.Euler(0f, sceneCameraBodyYaw, 0f);
+        Quaternion manualLook = Quaternion.Euler(totalLook.y, totalLook.x, 0f);
+
+        position = sceneCameraBasePosition + Vector3.up * cameraHeightOffset + sceneCameraBaseRotation * sceneCameraInputOffset;
+        rotation = sceneCameraBaseRotation * bodyTurn * manualLook;
+    }
+
+    private Vector3 ViewportToWorldPointFromPose(Vector3 viewportPoint, Vector3 cameraPosition, Quaternion cameraRotation, float fieldOfView, float orthographicSize)
+    {
+        float aspect = sceneCamera == null ? 16f / 9f : Mathf.Max(0.01f, sceneCamera.aspect);
+        float depth = Mathf.Max(0.01f, viewportPoint.z);
+
+        if (sceneCamera != null && sceneCamera.orthographic)
+        {
+            float viewHeight = orthographicSize * 2f;
+            float viewWidth = viewHeight * aspect;
+            Vector3 localPoint = new Vector3(
+                (viewportPoint.x - 0.5f) * viewWidth,
+                (viewportPoint.y - 0.5f) * viewHeight,
+                depth);
+            return cameraPosition + cameraRotation * localPoint;
+        }
+
+        float halfHeight = depth * Mathf.Tan(fieldOfView * 0.5f * Mathf.Deg2Rad);
+        float halfWidth = halfHeight * aspect;
+        Vector3 localPerspectivePoint = new Vector3(
+            (viewportPoint.x - 0.5f) * halfWidth * 2f,
+            (viewportPoint.y - 0.5f) * halfHeight * 2f,
+            depth);
+        return cameraPosition + cameraRotation * localPerspectivePoint;
     }
 
     private void UpdateSceneCharacterBillboard()
@@ -528,6 +633,232 @@ public class GalFbxSceneController : MonoBehaviour
         }
 
         sceneCharacter.transform.rotation = Quaternion.LookRotation(-toCamera.normalized, Vector3.up);
+    }
+
+    private void ResetUnauthorizedPassengerInteraction()
+    {
+        unauthorizedPassengerRevealed = false;
+        unauthorizedPassengerFocusRequested = false;
+        unauthorizedPassengerReveal = IsUnauthorizedPassengerInteractionEnabled() ? 0f : 1f;
+        unauthorizedPassengerFocus = 0f;
+
+        if (sceneCamera != null)
+        {
+            if (sceneCamera.orthographic)
+            {
+                sceneCamera.orthographicSize = sceneCameraBaseOrthographicSize;
+            }
+            else
+            {
+                sceneCamera.fieldOfView = sceneCameraBaseFieldOfView;
+            }
+        }
+    }
+
+    private void CancelUnauthorizedPassengerCameraFocus()
+    {
+        unauthorizedPassengerFocusRequested = false;
+        unauthorizedPassengerFocus = 0f;
+
+        if (sceneCamera == null)
+        {
+            return;
+        }
+
+        if (sceneCamera.orthographic)
+        {
+            sceneCamera.orthographicSize = sceneCameraBaseOrthographicSize;
+        }
+        else
+        {
+            sceneCamera.fieldOfView = sceneCameraBaseFieldOfView;
+        }
+    }
+
+    private bool IsUnauthorizedPassengerInteractionEnabled()
+    {
+        return string.Equals(NormalizeCharacterImageId(characterImageId), DefaultCharacterImageId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void UpdateUnauthorizedPassengerInteraction()
+    {
+        if (!controlsEnabled || !IsUnauthorizedPassengerInteractionEnabled())
+        {
+            return;
+        }
+
+        if (!Input.GetMouseButtonDown(0) || IsPointerOverUi())
+        {
+            return;
+        }
+
+        if (IsPointerOverUnauthorizedPassenger())
+        {
+            if (!unauthorizedPassengerRevealed)
+            {
+                unauthorizedPassengerRevealed = true;
+                unauthorizedPassengerFocusRequested = true;
+                Debug.Log("GAL FBX unauthorized passenger peek triggered.");
+                return;
+            }
+
+            if (unauthorizedPassengerReveal >= 0.82f)
+            {
+                CharacterDialogueRequested?.Invoke(DefaultCharacterImageId);
+            }
+        }
+    }
+
+    private void UpdateUnauthorizedPassengerAnimation()
+    {
+        if (sceneCharacter == null)
+        {
+            return;
+        }
+
+        bool specialCharacter = IsUnauthorizedPassengerInteractionEnabled();
+        float approachPeek = Mathf.Lerp(0.02f, UnauthorizedPassengerPeekReveal, Mathf.InverseLerp(0.12f, 0.66f, sceneCameraInputOffset.z));
+        float revealTarget = specialCharacter ? (unauthorizedPassengerRevealed ? 1f : approachPeek) : 1f;
+        float revealSpeed = unauthorizedPassengerRevealed ? UnauthorizedPassengerRevealSpeed : UnauthorizedPassengerPeekSpeed;
+        unauthorizedPassengerReveal = Mathf.MoveTowards(unauthorizedPassengerReveal, revealTarget, Time.unscaledDeltaTime * revealSpeed);
+
+        float focusTarget = specialCharacter && unauthorizedPassengerFocusRequested ? 1f : 0f;
+        unauthorizedPassengerFocus = Mathf.MoveTowards(unauthorizedPassengerFocus, focusTarget, Time.unscaledDeltaTime * UnauthorizedPassengerFocusSpeed);
+        ApplyUnauthorizedPassengerPose();
+    }
+
+    private void ApplyUnauthorizedPassengerPose()
+    {
+        if (sceneCharacter == null)
+        {
+            return;
+        }
+
+        float reveal = IsUnauthorizedPassengerInteractionEnabled() ? Mathf.Clamp01(unauthorizedPassengerReveal) : 1f;
+        float hidden = 1f - reveal;
+        float popEase = Mathf.SmoothStep(0f, 1f, reveal);
+        Vector3 hiddenOffset =
+            sceneCharacterAnchorRight * (sceneCharacterBaseScale.x * UnauthorizedPassengerHiddenSideOffset * hidden) +
+            sceneCharacterAnchorUp * (sceneCharacterBaseScale.y * UnauthorizedPassengerHiddenVerticalOffset * hidden);
+        float popOvershoot = Mathf.Sin(popEase * Mathf.PI) * 0.045f;
+
+        sceneCharacter.transform.position = sceneCharacterBasePosition + hiddenOffset;
+        sceneCharacter.transform.localScale = new Vector3(
+            sceneCharacterBaseScale.x * Mathf.Lerp(0.92f, 1f + popOvershoot, popEase),
+            sceneCharacterBaseScale.y * Mathf.Lerp(0.96f, 1f + popOvershoot, popEase),
+            sceneCharacterBaseScale.z);
+
+        if (sceneCharacterMaterial != null)
+        {
+            sceneCharacterMaterial.SetFloat("_Opacity", Mathf.Lerp(0.64f, 0.9f, popEase));
+        }
+    }
+
+    private void ApplyUnauthorizedPassengerCameraFocus()
+    {
+        if (sceneCamera == null || sceneCameraTransform == null)
+        {
+            return;
+        }
+
+        if (!IsUnauthorizedPassengerInteractionEnabled())
+        {
+            unauthorizedPassengerFocus = 0f;
+        }
+
+        float focus = Mathf.Clamp01(unauthorizedPassengerFocus);
+        if (sceneCamera.orthographic)
+        {
+            sceneCamera.orthographicSize = Mathf.Lerp(sceneCameraBaseOrthographicSize, sceneCameraBaseOrthographicSize * 0.98f, focus);
+        }
+        else
+        {
+            sceneCamera.fieldOfView = Mathf.Lerp(sceneCameraBaseFieldOfView, Mathf.Max(30f, sceneCameraBaseFieldOfView - UnauthorizedPassengerFocusFieldOfViewZoom), focus);
+        }
+
+        if (focus <= 0.001f || sceneCharacter == null)
+        {
+            return;
+        }
+
+        Vector3 focusTarget = sceneCharacterBasePosition - sceneCharacterAnchorRight * (sceneCharacterBaseScale.x * 0.18f) - sceneCharacterAnchorUp * (sceneCharacterBaseScale.y * 0.08f);
+        Vector3 toTarget = focusTarget - sceneCameraTransform.position;
+        if (toTarget.sqrMagnitude < 0.001f)
+        {
+            return;
+        }
+
+        Vector3 horizontalTarget = Vector3.ProjectOnPlane(toTarget, sceneCharacterAnchorUp);
+        Vector3 pushDirection = horizontalTarget.sqrMagnitude > 0.001f ? horizontalTarget.normalized : toTarget.normalized;
+        Vector3 push = pushDirection * (UnauthorizedPassengerFocusPushDistance * focus);
+        sceneCameraTransform.position += push;
+        Quaternion targetRotation = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
+        sceneCameraTransform.rotation = Quaternion.Slerp(sceneCameraTransform.rotation, targetRotation, UnauthorizedPassengerFocusLookStrength * focus);
+    }
+
+    private bool IsPointerOverUnauthorizedPassenger()
+    {
+        if (sceneCamera == null || sceneCharacter == null)
+        {
+            return false;
+        }
+
+        Renderer renderer = sceneCharacter.GetComponent<Renderer>();
+        if (renderer == null)
+        {
+            return false;
+        }
+
+        Bounds bounds = renderer.bounds;
+        Vector3 min = bounds.min;
+        Vector3 max = bounds.max;
+        Vector3[] corners =
+        {
+            new Vector3(min.x, min.y, min.z),
+            new Vector3(min.x, min.y, max.z),
+            new Vector3(min.x, max.y, min.z),
+            new Vector3(min.x, max.y, max.z),
+            new Vector3(max.x, min.y, min.z),
+            new Vector3(max.x, min.y, max.z),
+            new Vector3(max.x, max.y, min.z),
+            new Vector3(max.x, max.y, max.z)
+        };
+
+        float minX = float.PositiveInfinity;
+        float minY = float.PositiveInfinity;
+        float maxX = float.NegativeInfinity;
+        float maxY = float.NegativeInfinity;
+        bool hasVisibleCorner = false;
+        for (int i = 0; i < corners.Length; i++)
+        {
+            Vector3 screenPoint = sceneCamera.WorldToScreenPoint(corners[i]);
+            if (screenPoint.z <= 0f)
+            {
+                continue;
+            }
+
+            hasVisibleCorner = true;
+            minX = Mathf.Min(minX, screenPoint.x);
+            minY = Mathf.Min(minY, screenPoint.y);
+            maxX = Mathf.Max(maxX, screenPoint.x);
+            maxY = Mathf.Max(maxY, screenPoint.y);
+        }
+
+        if (!hasVisibleCorner)
+        {
+            return false;
+        }
+
+        Vector2 center = new Vector2((minX + maxX) * 0.5f, (minY + maxY) * 0.5f);
+        float width = Mathf.Max(maxX - minX + UnauthorizedPassengerClickPadding * 2f, UnauthorizedPassengerMinimumClickSize);
+        float height = Mathf.Max(maxY - minY + UnauthorizedPassengerClickPadding * 2f, UnauthorizedPassengerMinimumClickSize);
+        Rect clickRect = new Rect(center.x - width * 0.5f, center.y - height * 0.5f, width, height);
+        return clickRect.Contains(Input.mousePosition);
+    }
+
+    private static bool IsPointerOverUi()
+    {
+        return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
     }
 
     private void ApplyCharacterMoodSettings(float strength)
@@ -585,6 +916,10 @@ public class GalFbxSceneController : MonoBehaviour
 
         sceneCameraTransform.position = sceneCameraBasePosition + Vector3.up * cameraHeightOffset + sceneCameraBaseRotation * (sceneCameraInputOffset + sway + walkBob);
         sceneCameraTransform.rotation = sceneCameraBaseRotation * bodyTurn * manualLook * roll;
+        UpdateUnauthorizedPassengerInteraction();
+        UpdateUnauthorizedPassengerAnimation();
+        ApplyUnauthorizedPassengerCameraFocus();
+        ApplyUnauthorizedPassengerPose();
         UpdateSceneCharacterBillboard();
     }
 
@@ -698,6 +1033,7 @@ public class GalFbxSceneController : MonoBehaviour
             sceneCameraMoveBlend = 0f;
             sceneCameraTurnLean = 0f;
             sceneCameraStepTime = 0f;
+            ResetUnauthorizedPassengerInteraction();
         }
     }
 

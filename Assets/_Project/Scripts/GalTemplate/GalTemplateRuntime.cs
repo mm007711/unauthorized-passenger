@@ -247,6 +247,7 @@ public class GalTemplateRuntime : MonoBehaviour
     private const string SaveFolderName = "GalTemplate";
     private const int SaveSlotCount = 6;
     private const int QuickSaveSlot = 1;
+    private const string ExternalCharacterDialogueNodeId = "__fbx_unauthorized_passenger_test_dialogue";
     private static readonly string[] CharacterImportExtensions = { ".png", ".jpg", ".jpeg" };
 
     private static GalTemplateRuntime instance;
@@ -285,6 +286,13 @@ public class GalTemplateRuntime : MonoBehaviour
     private string currentLine;
     private bool currentNodeCommandsExecuted;
     private bool currentNodeWasReadBefore;
+    private bool isExternalSceneDialogue;
+    private string externalSceneReturnNodeId;
+    private GalStoryNode externalSceneReturnNode;
+    private bool externalSceneReturnWasExploring;
+    private bool externalSceneReturnCommandsExecuted;
+    private bool externalSceneReturnWasReadBefore;
+    private int externalSceneDialogueOpenedFrame = -1;
     private bool isTyping;
     private bool isInGame;
     private bool isExploring;
@@ -488,7 +496,20 @@ public class GalTemplateRuntime : MonoBehaviour
         LoadStory();
         BuildUi();
         ApplySettings();
+        GalFbxSceneController.Instance.CharacterDialogueRequested += HandleFbxCharacterDialogueRequested;
         ShowMainMenu();
+    }
+
+    private void OnDestroy()
+    {
+        if (instance == this)
+        {
+            GalFbxSceneController controller = FindObjectOfType<GalFbxSceneController>();
+            if (controller != null)
+            {
+                controller.CharacterDialogueRequested -= HandleFbxCharacterDialogueRequested;
+            }
+        }
     }
 
     private void Update()
@@ -607,6 +628,11 @@ public class GalTemplateRuntime : MonoBehaviour
         }
 
         bool pressedContinue = Input.GetKeyDown(KeyCode.Space) || (Input.GetMouseButtonDown(0) && !IsPointerOverInteractiveUi());
+        if (Time.frameCount == externalSceneDialogueOpenedFrame)
+        {
+            pressedContinue = false;
+        }
+
         if (pressedContinue)
         {
             ContinueStory();
@@ -616,7 +642,7 @@ public class GalTemplateRuntime : MonoBehaviour
     private void UpdateExternalSceneInput()
     {
         bool overlayOpen = IsOverlayPageOpen();
-        GalFbxSceneController.Instance.SetControlsEnabled(!overlayOpen && !IsPointerOverInteractiveUi());
+        GalFbxSceneController.Instance.SetControlsEnabled(!overlayOpen && !isExternalSceneDialogue && !IsPointerOverInteractiveUi());
 
         if (overlayOpen)
         {
@@ -625,6 +651,12 @@ public class GalTemplateRuntime : MonoBehaviour
                 ExitOverlayPages();
             }
 
+            return;
+        }
+
+        if (isExternalSceneDialogue)
+        {
+            UpdateExternalSceneDialogueInput();
             return;
         }
 
@@ -650,6 +682,32 @@ public class GalTemplateRuntime : MonoBehaviour
         else if (Input.GetKeyDown(KeyCode.Escape))
         {
             ExitFbxScene();
+        }
+    }
+
+    private void UpdateExternalSceneDialogueInput()
+    {
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            EndExternalSceneDialogue();
+            return;
+        }
+
+        if (Input.GetMouseButtonDown(1))
+        {
+            ToggleDialogueHidden();
+            return;
+        }
+
+        if (isDialogueHidden || currentNode == null || isAwaitingChoice)
+        {
+            return;
+        }
+
+        bool pressedContinue = Input.GetKeyDown(KeyCode.Space) || (Input.GetMouseButtonDown(0) && !IsPointerOverInteractiveUi());
+        if (pressedContinue)
+        {
+            ContinueStory();
         }
     }
 
@@ -723,8 +781,8 @@ public class GalTemplateRuntime : MonoBehaviour
 
         Directory.CreateDirectory(SaveDirectory);
         GalTemplateSaveData data = new GalTemplateSaveData();
-        data.isExploring = isExploring;
-        data.currentNodeId = currentNodeId;
+        data.isExploring = isExternalSceneDialogue ? externalSceneReturnWasExploring : isExploring;
+        data.currentNodeId = isExternalSceneDialogue ? externalSceneReturnNodeId : currentNodeId;
         data.currentBackgroundId = currentBackgroundId;
         data.savedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         data.flags.AddRange(flags);
@@ -755,6 +813,7 @@ public class GalTemplateRuntime : MonoBehaviour
 
     public bool LoadGameFromSlot(int slot)
     {
+        EndExternalSceneDialogue();
         string path = GetSavePath(slot);
         if (!File.Exists(path))
         {
@@ -954,6 +1013,11 @@ public class GalTemplateRuntime : MonoBehaviour
 
         if (currentNode == null)
         {
+            if (isExternalSceneDialogue)
+            {
+                EndExternalSceneDialogue();
+            }
+
             return;
         }
 
@@ -1029,6 +1093,12 @@ public class GalTemplateRuntime : MonoBehaviour
         if (!string.IsNullOrEmpty(node.nextId))
         {
             PlayNode(node.nextId);
+            return;
+        }
+
+        if (isExternalSceneDialogue)
+        {
+            EndExternalSceneDialogue();
             return;
         }
 
@@ -1283,11 +1353,13 @@ public class GalTemplateRuntime : MonoBehaviour
 
     private void ExitFbxScene()
     {
+        EndExternalSceneDialogue();
         GalFbxSceneController.Instance.Exit(ShowGalAfterExternalScene);
     }
 
     private void ShowMainMenuFromExternalScene()
     {
+        EndExternalSceneDialogue();
         if (!GalFbxSceneController.IsSceneActive)
         {
             ShowMainMenu();
@@ -1363,6 +1435,133 @@ public class GalTemplateRuntime : MonoBehaviour
         }
 
         ShowExplore();
+    }
+
+    private void HandleFbxCharacterDialogueRequested(string characterId)
+    {
+        if (!GalFbxSceneController.IsSceneActive || isExternalSceneDialogue || IsOverlayPageOpen())
+        {
+            return;
+        }
+
+        if (!string.Equals(characterId, GalFbxSceneController.DefaultCharacterImageId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        StartExternalSceneDialogue(CreateUnauthorizedPassengerTestNode());
+    }
+
+    private void StartExternalSceneDialogue(GalStoryNode node)
+    {
+        if (node == null || dialogueRoot == null)
+        {
+            return;
+        }
+
+        FinishTypingForMenu();
+        CancelAutoAdvance();
+        externalSceneReturnNode = currentNode;
+        externalSceneReturnNodeId = currentNodeId;
+        externalSceneReturnWasExploring = isExploring;
+        externalSceneReturnCommandsExecuted = currentNodeCommandsExecuted;
+        externalSceneReturnWasReadBefore = currentNodeWasReadBefore;
+        isExternalSceneDialogue = true;
+        isExploring = false;
+        isDialogueHidden = false;
+        isAwaitingChoice = false;
+        ClearChoices();
+
+        if (fbxHudRoot != null)
+        {
+            fbxHudRoot.SetActive(true);
+        }
+
+        currentNode = node;
+        currentNodeId = node.id;
+        currentNodeCommandsExecuted = true;
+        currentNodeWasReadBefore = true;
+        externalSceneDialogueOpenedFrame = Time.frameCount;
+        speakerText.text = string.IsNullOrEmpty(node.speaker) ? " " : node.speaker;
+        currentLine = node.text ?? string.Empty;
+        AddHistory(node);
+        dialogueRoot.SetActive(true);
+        StartTyping(currentLine);
+    }
+
+    private void EndExternalSceneDialogue()
+    {
+        if (!isExternalSceneDialogue)
+        {
+            return;
+        }
+
+        FinishTypingForMenu();
+        CancelAutoAdvance();
+        ClearChoices();
+        isExternalSceneDialogue = false;
+        isAwaitingChoice = false;
+        isDialogueHidden = false;
+        isExploring = externalSceneReturnWasExploring;
+        currentNode = externalSceneReturnNode;
+        currentNodeId = externalSceneReturnNodeId;
+        currentNodeCommandsExecuted = externalSceneReturnCommandsExecuted;
+        currentNodeWasReadBefore = externalSceneReturnWasReadBefore;
+        currentLine = currentNode == null ? string.Empty : currentNode.text ?? string.Empty;
+        externalSceneReturnNode = null;
+        externalSceneReturnNodeId = null;
+        externalSceneDialogueOpenedFrame = -1;
+
+        if (dialogueRoot != null)
+        {
+            dialogueRoot.SetActive(false);
+        }
+
+        if (GalFbxSceneController.IsSceneActive)
+        {
+            SetExternalSceneHudVisible(true);
+            GalFbxSceneController.Instance.SetControlsEnabled(true);
+        }
+    }
+
+    private GalStoryNode CreateUnauthorizedPassengerTestNode()
+    {
+        return new GalStoryNode
+        {
+            id = ExternalCharacterDialogueNodeId,
+            speaker = GetUnauthorizedPassengerTestSpeaker(),
+            text = GetUnauthorizedPassengerTestText()
+        };
+    }
+
+    private string GetUnauthorizedPassengerTestSpeaker()
+    {
+        switch (settings.language)
+        {
+            case "en-US":
+            case "en":
+                return "Unauthorized Passenger";
+            case "ja-JP":
+            case "ja":
+                return "未許可の乗客";
+            default:
+                return "未许客";
+        }
+    }
+
+    private string GetUnauthorizedPassengerTestText()
+    {
+        switch (settings.language)
+        {
+            case "en-US":
+            case "en":
+                return "Test placeholder dialogue. You found the passenger peeking out from behind the seat.";
+            case "ja-JP":
+            case "ja":
+                return "テスト用の仮テキストです。座席の陰から顔を出した乗客を見つけました。";
+            default:
+                return "测试占位文案。你发现了从座椅侧面探出头来的未许客。";
+        }
     }
 
     private void SetGalSceneLayersVisible(bool visible)
