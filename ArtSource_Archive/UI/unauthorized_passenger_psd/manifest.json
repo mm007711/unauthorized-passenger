@@ -1,0 +1,844 @@
+{
+  "id": "unauthorized_passenger_psd",
+  "sourceFile": "Assets/_Project/ArtSource/UI/unauthorized_passenger_psd/ui_source.psd",
+  "preview": "Assets/StreamingAssets/GAL/UISkins/unauthorized_passenger/source_preview.png",
+  "width": 2266,
+  "height": 1488,
+  "colorMode": "3",
+  "layerCount": 46,
+  "layers": [
+    {
+      "name": "背景",
+      "path": "背景",
+      "depth": 0,
+      "kind": "pixel",
+      "visible": false,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "新建组",
+      "path": "新建组",
+      "depth": 0,
+      "kind": "group",
+      "visible": false,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "size": [
+        0,
+        0
+      ]
+    },
+    {
+      "name": "图层 5",
+      "path": "新建组/图层 5",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": false,
+      "opacity": 64,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 14",
+      "path": "新建组/图层 14",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": false,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 6",
+      "path": "新建组/图层 6",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": false,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": false,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": false,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "新建组",
+      "path": "新建组",
+      "depth": 0,
+      "kind": "group",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 5",
+      "path": "新建组/图层 5",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 92,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 14",
+      "path": "新建组/图层 14",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 113,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 27",
+      "path": "新建组/图层 27",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 6",
+      "path": "新建组/图层 6",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "新建组",
+      "path": "新建组",
+      "depth": 0,
+      "kind": "group",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 5",
+      "path": "新建组/图层 5",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 92,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 14",
+      "path": "新建组/图层 14",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 113,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 27",
+      "path": "新建组/图层 27",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 6",
+      "path": "新建组/图层 6",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "新建组",
+      "path": "新建组",
+      "depth": 0,
+      "kind": "group",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 5",
+      "path": "新建组/图层 5",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 92,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 14",
+      "path": "新建组/图层 14",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 113,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 27",
+      "path": "新建组/图层 27",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 6",
+      "path": "新建组/图层 6",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "新建组",
+      "path": "新建组",
+      "depth": 0,
+      "kind": "group",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 5",
+      "path": "新建组/图层 5",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 110,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 33",
+      "path": "新建组/图层 33",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 6",
+      "path": "新建组/图层 6",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 13",
+      "path": "新建组/图层 13",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 71,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "新建组",
+      "path": "新建组",
+      "depth": 0,
+      "kind": "group",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 255,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 34",
+      "path": "新建组/图层 34",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 219,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    },
+    {
+      "name": "图层 1",
+      "path": "新建组/图层 1",
+      "depth": 1,
+      "kind": "pixel",
+      "visible": true,
+      "opacity": 220,
+      "bbox": [
+        0,
+        0,
+        2266,
+        1488
+      ],
+      "size": [
+        2266,
+        1488
+      ]
+    }
+  ],
+  "notes": [
+    "PSD source is kept under Assets/_Project/ArtSource for art iteration.",
+    "Runtime UI sprites should be exported as PNG into Assets/StreamingAssets/GAL/UISkins/unauthorized_passenger/.",
+    "The current runtime still uses generated UGUI shapes; these assets are staged for the next UI replacement pass."
+  ]
+}

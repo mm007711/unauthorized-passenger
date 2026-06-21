@@ -14,6 +14,7 @@ public class GalFbxSceneController : MonoBehaviour
     private const float MaxCameraHeightOffset = 0.6f;
     private const float DefaultMoodIntensity = 0.75f;
     public const string DefaultCharacterImageId = "unauthorized_passenger";
+    public const string DefaultSceneResourcePath = DefaultResourcePath;
     public const string LocalCharacterImagePrefix = "local:";
     private const string CharacterResourceFolder = "Characters";
     private const string DefaultCharacterTexturePath = CharacterResourceFolder + "/" + DefaultCharacterImageId;
@@ -23,6 +24,7 @@ public class GalFbxSceneController : MonoBehaviour
     public const float DefaultCharacterViewportDepth = 3.2f;
     public const float DefaultCharacterScreenHeight = 0.58f;
     public const float DefaultCharacterPixelSize = 1f;
+    public const float DefaultCharacterPixelRefinement = 2f;
     public const float DefaultCharacterMoodBlend = 0.3f;
     public const float MinCharacterViewportX = -0.35f;
     public const float MaxCharacterViewportX = 1.35f;
@@ -34,6 +36,8 @@ public class GalFbxSceneController : MonoBehaviour
     public const float MaxCharacterScreenHeight = 2.2f;
     public const float MinCharacterPixelSize = 1f;
     public const float MaxCharacterPixelSize = 64f;
+    public const float MinCharacterPixelRefinement = 1f;
+    public const float MaxCharacterPixelRefinement = 4f;
     private const float CharacterDepthNearScale = 1.08f;
     private const float CharacterDepthFarScale = 0.92f;
     private const float UnauthorizedPassengerHiddenSideOffset = -0.76f;
@@ -84,6 +88,8 @@ public class GalFbxSceneController : MonoBehaviour
     private float sceneCameraStepTime;
     private float cameraHeightOffset = DefaultCameraHeightOffset;
     private float moodIntensity = DefaultMoodIntensity;
+    private string activeResourcePath = DefaultResourcePath;
+    private float activePixelSize;
     private string characterImageId = DefaultCharacterImageId;
     private string characterTexturePath = DefaultCharacterTexturePath;
     private float characterViewportX = DefaultCharacterViewportX;
@@ -91,6 +97,7 @@ public class GalFbxSceneController : MonoBehaviour
     private float characterViewportDepth = DefaultCharacterViewportDepth;
     private float characterScreenHeight = DefaultCharacterScreenHeight;
     private float characterPixelSize = DefaultCharacterPixelSize;
+    private float characterPixelRefinement = DefaultCharacterPixelRefinement;
     private float characterMoodBlend = DefaultCharacterMoodBlend;
     private Vector3 sceneCharacterBasePosition;
     private Vector3 sceneCharacterBaseScale = Vector3.one;
@@ -132,6 +139,16 @@ public class GalFbxSceneController : MonoBehaviour
         get { return instance != null && instance.isActive; }
     }
 
+    public string ActiveResourcePath
+    {
+        get { return string.IsNullOrEmpty(activeResourcePath) ? DefaultResourcePath : activeResourcePath; }
+    }
+
+    public float ActivePixelSize
+    {
+        get { return activePixelSize; }
+    }
+
     public event Action<string> CharacterDialogueRequested;
 
     public static string GetLocalCharacterImportDirectory()
@@ -155,7 +172,7 @@ public class GalFbxSceneController : MonoBehaviour
         ApplyMoodSettings();
     }
 
-    public void SetCharacterSettings(string imageId, float viewportX, float viewportY, float viewportDepth, float screenHeight, float pixelSize, float moodBlend)
+    public void SetCharacterSettings(string imageId, float viewportX, float viewportY, float viewportDepth, float screenHeight, float pixelSize, float pixelRefinement, float moodBlend)
     {
         string normalizedImageId = NormalizeCharacterImageId(imageId);
         bool imageChanged = normalizedImageId != characterImageId;
@@ -164,6 +181,7 @@ public class GalFbxSceneController : MonoBehaviour
         float nextViewportDepth = Mathf.Clamp(viewportDepth, MinCharacterViewportDepth, MaxCharacterViewportDepth);
         float nextScreenHeight = Mathf.Clamp(screenHeight, MinCharacterScreenHeight, MaxCharacterScreenHeight);
         float nextPixelSize = Mathf.Clamp(pixelSize, MinCharacterPixelSize, MaxCharacterPixelSize);
+        float nextPixelRefinement = Mathf.Clamp(pixelRefinement, MinCharacterPixelRefinement, MaxCharacterPixelRefinement);
         float nextMoodBlend = Mathf.Clamp01(moodBlend);
         bool placementChanged =
             !Mathf.Approximately(nextViewportX, characterViewportX) ||
@@ -172,6 +190,7 @@ public class GalFbxSceneController : MonoBehaviour
             !Mathf.Approximately(nextScreenHeight, characterScreenHeight);
         bool materialChanged =
             !Mathf.Approximately(nextPixelSize, characterPixelSize) ||
+            !Mathf.Approximately(nextPixelRefinement, characterPixelRefinement) ||
             !Mathf.Approximately(nextMoodBlend, characterMoodBlend);
 
         characterImageId = normalizedImageId;
@@ -181,11 +200,13 @@ public class GalFbxSceneController : MonoBehaviour
         characterViewportDepth = nextViewportDepth;
         characterScreenHeight = nextScreenHeight;
         characterPixelSize = nextPixelSize;
+        characterPixelRefinement = nextPixelRefinement;
         characterMoodBlend = nextMoodBlend;
 
         if (sceneCharacterMaterial != null)
         {
             sceneCharacterMaterial.SetFloat("_PixelSize", characterPixelSize);
+            sceneCharacterMaterial.SetFloat("_PixelRefinement", characterPixelRefinement);
         }
 
         if (sceneCharacter != null && sceneCamera != null)
@@ -270,11 +291,13 @@ public class GalFbxSceneController : MonoBehaviour
     {
         DestroyScene();
         DisableOtherCameras();
+        activeResourcePath = string.IsNullOrEmpty(resourcePath) ? DefaultResourcePath : resourcePath;
+        activePixelSize = Mathf.Max(0f, pixelSize);
 
         sceneRoot = new GameObject("Runtime FBX Scene");
         DontDestroyOnLoad(sceneRoot);
 
-        GameObject prefab = Resources.Load<GameObject>(resourcePath);
+        GameObject prefab = Resources.Load<GameObject>(activeResourcePath);
         GameObject importedScene = null;
         if (prefab != null)
         {
@@ -283,11 +306,11 @@ public class GalFbxSceneController : MonoBehaviour
             importedScene.transform.localPosition = Vector3.zero;
             importedScene.transform.localRotation = Quaternion.identity;
             importedScene.transform.localScale = Vector3.one;
-            Debug.Log("GAL FBX scene loaded: " + resourcePath);
+            Debug.Log("GAL FBX scene loaded: " + activeResourcePath);
         }
         else
         {
-            Debug.LogWarning("GAL FBX scene missing Resources asset: " + resourcePath);
+            Debug.LogWarning("GAL FBX scene missing Resources asset: " + activeResourcePath);
         }
 
         int lightCount = EnableImportedLights(importedScene);
@@ -323,7 +346,7 @@ public class GalFbxSceneController : MonoBehaviour
                 sceneMoodEffect = sceneCamera.gameObject.AddComponent<CabinMoodImageEffect>();
             }
 
-            ApplyPixelateEffect(sceneCamera, pixelSize);
+            ApplyPixelateEffect(sceneCamera, activePixelSize);
             AddSceneCharacter(sceneBounds);
         }
 
@@ -400,6 +423,7 @@ public class GalFbxSceneController : MonoBehaviour
         sceneCharacterMaterial.SetFloat("_BlackSoftness", 0.035f);
         sceneCharacterMaterial.SetFloat("_ZTest", 4f);
         sceneCharacterMaterial.SetFloat("_PixelSize", characterPixelSize);
+        sceneCharacterMaterial.SetFloat("_PixelRefinement", characterPixelRefinement);
         sceneCharacterMaterial.renderQueue = 2490;
         ApplyCharacterMoodSettings(Mathf.Clamp01(moodIntensity));
 
@@ -875,6 +899,7 @@ public class GalFbxSceneController : MonoBehaviour
         sceneCharacterMaterial.SetFloat("_EdgeDarkness", Mathf.Lerp(0.04f, 0.24f, strength) * characterMoodBlend);
         sceneCharacterMaterial.SetFloat("_RimStrength", Mathf.Lerp(0.03f, 0.15f, strength) * characterMoodBlend);
         sceneCharacterMaterial.SetFloat("_PixelSize", characterPixelSize);
+        sceneCharacterMaterial.SetFloat("_PixelRefinement", characterPixelRefinement);
     }
 
     private void LateUpdate()

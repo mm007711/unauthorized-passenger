@@ -119,3 +119,6 @@ story,node.ending_001,??????,我,是床。我醒来的地方，也是这个房�
 story,node.ending_002,??????,旁白,门锁轻轻响了一声。线稿外的世界，还没有被画出来。,Narration,The lock clicked softly. The world beyond the line art has not been drawn yet.,地の文,鍵が小さく鳴った。線画の外の世界は、まだ描かれていない。,
 choice,choice.ending_002.01,????,,回到标题,,Return to Title,,タイトルへ戻る,
 choice,choice.ending_002.02,????,,继续探索,,Keep Exploring,,探索を続ける,
+ui,ui.save.location_explore,Runtime UI text.,,探索中,,Exploring,,探索中,
+ui,ui.save.location_dialogue,Runtime UI text.,,对话中,,Dialogue,,会話中,
+ui,ui.settings.bgm_volume,Runtime UI text.,,音乐音量,,BGM Volume,,BGM音量,

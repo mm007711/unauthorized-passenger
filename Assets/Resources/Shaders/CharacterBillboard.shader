@@ -14,6 +14,7 @@ Shader "GalTemplate/CharacterBillboard"
         _EdgeDarkness ("Edge Darkness", Range(0, 1)) = 0.18
         _RimStrength ("Rim Strength", Range(0, 1)) = 0.12
         _PixelSize ("Character Pixel Size", Range(1, 24)) = 1
+        _PixelRefinement ("Character Pixel Refinement", Range(1, 4)) = 2
         _ZTest ("ZTest", Float) = 4
     }
 
@@ -53,6 +54,7 @@ Shader "GalTemplate/CharacterBillboard"
             float _EdgeDarkness;
             float _RimStrength;
             float _PixelSize;
+            float _PixelRefinement;
 
             struct appdata
             {
@@ -77,9 +79,10 @@ Shader "GalTemplate/CharacterBillboard"
             fixed4 frag(v2f input) : SV_Target
             {
                 float2 uv = input.uv;
-                if (_PixelSize > 1.01)
+                float effectivePixelSize = max(1.0, _PixelSize / max(1.0, _PixelRefinement));
+                if (effectivePixelSize > 1.01)
                 {
-                    float2 pixelGrid = max(float2(1.0, 1.0), _MainTex_TexelSize.zw / _PixelSize);
+                    float2 pixelGrid = max(float2(1.0, 1.0), _MainTex_TexelSize.zw / effectivePixelSize);
                     uv = (floor(uv * pixelGrid) + 0.5) / pixelGrid;
                 }
 

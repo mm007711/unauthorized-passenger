@@ -93,3 +93,6 @@ story,node.ending_001,剧情测试占位 12,测试角色,中文测试占位文�
 story,node.ending_002,剧情测试占位 13,测试角色,中文测试占位文案 13：用于验证剧情文本、换行与热重载。,Test Speaker,"English placeholder line 13: used to verify story text, wrapping, and hot reload.",テスト役,日本語テスト仮文 13：本文表示、折り返し、ホットリロード確認用。,
 choice,choice.ending_002.01,选项测试占位 04,,中文选项占位 04,,English choice placeholder 04,,日本語選択肢仮文 04,
 choice,choice.ending_002.02,选项测试占位 05,,中文选项占位 05,,English choice placeholder 05,,日本語選択肢仮文 05,
+ui,ui.save.location_explore,运行时 UI 文案,,探索中,,Exploring,,探索中,
+ui,ui.save.location_dialogue,运行时 UI 文案,,对话中,,Dialogue,,会話中,
+ui,ui.settings.bgm_volume,运行时 UI 文案,,音乐音量,,BGM Volume,,BGM音量,

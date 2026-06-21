@@ -7,7 +7,7 @@
     {
       "id": "default",
       "displayName": "默认线稿",
-      "uiSkin": "LineSketch",
+      "uiSkin": "unauthorized_passenger",
       "backgroundFolder": "Backgrounds"
     },
     {
@@ -41,7 +41,7 @@
     {
       "id": "bedroom",
       "displayName": "卧室",
-      "path": "Backgrounds/bedroom_lineart.jpg"
+      "path": "UISkins/unauthorized_passenger/Sprites/title_background.png"
     },
     {
       "id": "living_room",

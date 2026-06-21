@@ -1,0 +1,74 @@
+{
+  "id": "unauthorized_passenger",
+  "displayName": "Unauthorized Passenger Prototype Skin",
+  "spriteFolder": "Sprites",
+  "sprites": {
+    "titleBackground": "title_background.png",
+    "titleLogo": "title_logo_large.png",
+    "buttonNormal": "button_normal.png",
+    "buttonHover": "button_hover.png",
+    "buttonPressed": "button_pressed.png",
+    "dialogueBox": "dialogue_box.png",
+    "titleLogoFrames": {
+      "folder": "TitleLogoFrames",
+      "prefix": "wuxuke_title_24f_",
+      "extension": ".png",
+      "count": 24,
+      "startIndex": 1,
+      "digits": 2,
+      "fps": 16
+    },
+    "titleLogoLocalizedFrames": [
+      {
+        "language": "zh",
+        "sequence": {
+          "folder": "TitleLogoFrames_zh",
+          "prefix": "title_",
+          "extension": ".png",
+          "count": 24,
+          "startIndex": 1,
+          "digits": 2,
+          "fps": 16
+        }
+      },
+      {
+        "language": "en",
+        "sequence": {
+          "folder": "TitleLogoFrames_en",
+          "prefix": "title_",
+          "extension": ".png",
+          "count": 24,
+          "startIndex": 1,
+          "digits": 2,
+          "fps": 16
+        }
+      },
+      {
+        "language": "ja",
+        "sequence": {
+          "folder": "TitleLogoFrames_ja",
+          "prefix": "title_",
+          "extension": ".png",
+          "count": 24,
+          "startIndex": 1,
+          "digits": 2,
+          "fps": 16
+        }
+      }
+    ]
+  },
+  "colors": {
+    "buttonText": "#fff1ff",
+    "buttonTextShadow": "#3a163e",
+    "panelText": "#211421",
+    "dialogueText": "#2b182b",
+    "dialogueSpeaker": "#3b193d",
+    "hudText": "#fff1ff"
+  },
+  "animation": {
+    "hoverScale": 1.035,
+    "pressedScale": 0.965,
+    "fadeDuration": 0.12,
+    "titleButtonStagger": 0.045
+  }
+}
