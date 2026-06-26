@@ -26,6 +26,10 @@ public class GalPortraitPose
     public string animation;
     public string path;
     public bool visible = true;
+    public Vector2 offset;
+    public float scaleMultiplier = 1f;
+    public float lowerMaskCutoff = -1f;
+    public float lowerMaskSoftness = 0.06f;
 }
 
 public class GalPortraitController : MonoBehaviour
@@ -43,6 +47,7 @@ public class GalPortraitController : MonoBehaviour
         public Image placeholder;
         public Text placeholderText;
         public CanvasGroup group;
+        public Material imageMaterial;
         public Vector2 basePosition;
         public Vector3 baseScale = Vector3.one;
         public Coroutine animationRoutine;
@@ -54,6 +59,7 @@ public class GalPortraitController : MonoBehaviour
     private readonly Dictionary<string, GalPortraitEntry> library = new Dictionary<string, GalPortraitEntry>();
     private readonly Dictionary<string, Texture2D> textureCache = new Dictionary<string, Texture2D>();
     private Font labelFont;
+    private bool pixelFilterEnabled = true;
 
     public void Initialize(Font font)
     {
@@ -80,6 +86,21 @@ public class GalPortraitController : MonoBehaviour
             {
                 library[entry.id] = entry;
             }
+        }
+    }
+
+    public void SetPixelFilterEnabled(bool enabled)
+    {
+        pixelFilterEnabled = enabled;
+
+        foreach (Texture2D texture in textureCache.Values)
+        {
+            ApplyTextureFilter(texture);
+        }
+
+        foreach (PortraitSlotState slot in slots.Values)
+        {
+            ApplyTextureFilter(slot.image.texture);
         }
     }
 
@@ -110,14 +131,17 @@ public class GalPortraitController : MonoBehaviour
         GalPortraitEntry entry = GetEntry(character);
         float width = entry != null && entry.width > 0f ? entry.width : 520f;
         float height = entry != null && entry.height > 0f ? entry.height : 900f;
-        float scale = entry != null && entry.scale > 0f ? entry.scale : 1f;
+        float scale = (entry != null && entry.scale > 0f ? entry.scale : 1f) * Mathf.Max(0.01f, pose.scaleMultiplier <= 0f ? 1f : pose.scaleMultiplier);
         slot.root.sizeDelta = new Vector2(width, height);
         slot.baseScale = Vector3.one * scale;
         slot.root.localScale = slot.baseScale;
+        slot.root.anchoredPosition = slot.basePosition + pose.offset;
+        ApplyLowerMask(slot, pose.lowerMaskCutoff, pose.lowerMaskSoftness);
 
         Texture2D texture = LoadPortraitTexture(pose, character, expression);
         if (texture != null)
         {
+            ApplyTextureFilter(texture);
             slot.image.texture = texture;
             slot.image.enabled = true;
             slot.imageAspect.aspectRatio = texture.width / (float)texture.height;
@@ -135,7 +159,6 @@ public class GalPortraitController : MonoBehaviour
 
         float facing = GetFacingSign(slotId, pose.facing);
         slot.imageRect.localScale = new Vector3(facing, 1f, 1f);
-        slot.root.anchoredPosition = slot.basePosition;
         slot.group.alpha = 1f;
         slot.group.blocksRaycasts = false;
 
@@ -163,6 +186,7 @@ public class GalPortraitController : MonoBehaviour
         state.expression = null;
         state.root.anchoredPosition = state.basePosition;
         state.root.localScale = state.baseScale;
+        ApplyLowerMask(state, -1f, 0.06f);
     }
 
     public void HideAll()
@@ -213,6 +237,11 @@ public class GalPortraitController : MonoBehaviour
         RawImage image = imageObject.AddComponent<RawImage>();
         image.enabled = false;
         image.raycastTarget = false;
+        Material imageMaterial = CreatePortraitMaterial();
+        if (imageMaterial != null)
+        {
+            image.material = imageMaterial;
+        }
         AspectRatioFitter imageAspect = imageObject.AddComponent<AspectRatioFitter>();
         imageAspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
         imageAspect.aspectRatio = 0.58f;
@@ -244,6 +273,7 @@ public class GalPortraitController : MonoBehaviour
             placeholder = placeholder,
             placeholderText = label,
             group = group,
+            imageMaterial = imageMaterial,
             basePosition = rect.anchoredPosition,
             baseScale = Vector3.one
         };
@@ -251,9 +281,9 @@ public class GalPortraitController : MonoBehaviour
 
     private IEnumerator AnimateSlot(PortraitSlotState slot, string animation)
     {
-        Vector2 origin = slot.basePosition;
-        Vector3 scale = slot.baseScale;
-        float duration = animation == "shake" || animation == "抖动" ? 0.34f : 0.42f;
+        Vector2 origin = slot.root.anchoredPosition;
+        Vector3 scale = slot.root.localScale;
+        float duration = animation == "shake" || animation == "抖动" ? 0.34f : (animation == "slide_left" || animation == "peek_left" ? 0.78f : 0.42f);
         float time = 0f;
 
         while (time < duration)
@@ -279,6 +309,13 @@ public class GalPortraitController : MonoBehaviour
             {
                 slot.group.alpha = Mathf.Clamp01(t);
             }
+            else if (animation == "slide_left" || animation == "peek_left")
+            {
+                float eased = SmoothOut(t);
+                slot.group.alpha = eased;
+                slot.root.anchoredPosition = origin + new Vector2(Mathf.Lerp(-190f, 0f, eased), Mathf.Sin(t * Mathf.PI) * 6f);
+                slot.root.localScale = scale * Mathf.Lerp(0.92f, 1f, eased);
+            }
 
             yield return null;
         }
@@ -292,6 +329,15 @@ public class GalPortraitController : MonoBehaviour
     private Texture2D LoadPortraitTexture(GalPortraitPose pose, string character, string expression)
     {
         string explicitPath = pose != null ? pose.path : null;
+        if (IsResourcePath(explicitPath))
+        {
+            Texture2D explicitResource = LoadResourceTexture(StripResourcePrefix(explicitPath));
+            if (explicitResource != null)
+            {
+                return explicitResource;
+            }
+        }
+
         List<string> candidates = new List<string>();
         if (!string.IsNullOrEmpty(explicitPath))
         {
@@ -313,6 +359,7 @@ public class GalPortraitController : MonoBehaviour
 
             if (textureCache.TryGetValue(candidate, out Texture2D cached))
             {
+                ApplyTextureFilter(cached);
                 return cached;
             }
 
@@ -325,11 +372,101 @@ public class GalPortraitController : MonoBehaviour
             }
 
             texture.name = Path.GetFileNameWithoutExtension(candidate);
+            ApplyTextureFilter(texture);
             textureCache[candidate] = texture;
             return texture;
         }
 
+        Texture2D resourceTexture = LoadResourceTexture("Characters/" + character + "_" + expression);
+        if (resourceTexture == null)
+        {
+            resourceTexture = LoadResourceTexture("Characters/" + character);
+        }
+
+        if (resourceTexture != null)
+        {
+            return resourceTexture;
+        }
+
         return null;
+    }
+
+    private Texture2D LoadResourceTexture(string resourcePath)
+    {
+        if (string.IsNullOrEmpty(resourcePath))
+        {
+            return null;
+        }
+
+        string normalized = StripResourcePrefix(resourcePath);
+        string cacheKey = "resources:" + normalized;
+        if (textureCache.TryGetValue(cacheKey, out Texture2D cached))
+        {
+            ApplyTextureFilter(cached);
+            return cached;
+        }
+
+        Texture2D texture = Resources.Load<Texture2D>(normalized);
+        if (texture == null)
+        {
+            return null;
+        }
+
+        ApplyTextureFilter(texture);
+        textureCache[cacheKey] = texture;
+        return texture;
+    }
+
+    private void ApplyTextureFilter(Texture texture)
+    {
+        if (texture == null)
+        {
+            return;
+        }
+
+        texture.filterMode = pixelFilterEnabled ? FilterMode.Point : FilterMode.Bilinear;
+        texture.anisoLevel = pixelFilterEnabled ? 0 : 1;
+    }
+
+    private static Material CreatePortraitMaterial()
+    {
+        Shader shader = Resources.Load<Shader>("Shaders/PortraitCrop");
+        if (shader == null)
+        {
+            shader = Shader.Find("UI/GalTemplate/PortraitCrop");
+        }
+
+        if (shader == null)
+        {
+            return null;
+        }
+
+        Material material = new Material(shader);
+        material.hideFlags = HideFlags.HideAndDontSave;
+        material.SetFloat("_UseLowerMask", 0f);
+        material.SetFloat("_LowerMaskCutoff", -1f);
+        material.SetFloat("_LowerMaskSoftness", 0.06f);
+        material.SetFloat("_Opacity", 1f);
+        return material;
+    }
+
+    private static void ApplyLowerMask(PortraitSlotState slot, float cutoff, float softness)
+    {
+        if (slot == null || slot.imageMaterial == null)
+        {
+            return;
+        }
+
+        bool enabled = cutoff >= 0f;
+        slot.imageMaterial.SetFloat("_UseLowerMask", enabled ? 1f : 0f);
+        slot.imageMaterial.SetFloat("_LowerMaskCutoff", enabled ? cutoff : -1f);
+        slot.imageMaterial.SetFloat("_LowerMaskSoftness", Mathf.Max(0.001f, softness));
+    }
+
+    private static float SmoothOut(float value)
+    {
+        value = Mathf.Clamp01(value);
+        return 1f - Mathf.Pow(1f - value, 3f);
     }
 
     private void AddPortraitCandidates(List<string> candidates, string folder, string filename)
@@ -370,6 +507,34 @@ public class GalPortraitController : MonoBehaviour
         }
 
         return Path.IsPathRooted(path) ? path : Path.Combine(Application.streamingAssetsPath, "GAL", path);
+    }
+
+    private static bool IsResourcePath(string path)
+    {
+        return !string.IsNullOrEmpty(path) && path.Trim().StartsWith("resources:", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string StripResourcePrefix(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return null;
+        }
+
+        string value = path.Trim().Replace('\\', '/');
+        if (value.StartsWith("resources:", StringComparison.OrdinalIgnoreCase))
+        {
+            value = value.Substring("resources:".Length);
+        }
+
+        value = value.TrimStart('/');
+        int extensionIndex = value.LastIndexOf('.');
+        if (extensionIndex > 0)
+        {
+            value = value.Substring(0, extensionIndex);
+        }
+
+        return value;
     }
 
     private static float GetFacingSign(string slot, string facing)

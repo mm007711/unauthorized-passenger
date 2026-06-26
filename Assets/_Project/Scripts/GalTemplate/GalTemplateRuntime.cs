@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 #if UNITY_EDITOR
@@ -81,6 +82,10 @@ public class GalStoryNode
     public string portraitFacing;
     public string portraitAnimation;
     public string portraitPath;
+    public string portraitOffsetX;
+    public string portraitOffsetY;
+    public string portraitScale;
+    public string portraitCrop;
     public string nextId;
     public List<GalStoryChoice> choices = new List<GalStoryChoice>();
     public List<GalStoryCommand> commands = new List<GalStoryCommand>();
@@ -108,6 +113,10 @@ public class GalStoryCommand
     public string facing;
     public string animation;
     public string path;
+    public float offsetX;
+    public float offsetY;
+    public float scale = 1f;
+    public float crop = -1f;
     public float amount;
 }
 
@@ -145,6 +154,7 @@ public class GalTemplateSettings
     public float fbxCharacterPixelSize = GalFbxSceneController.DefaultCharacterPixelSize;
     public float fbxCharacterPixelRefinement = GalFbxSceneController.DefaultCharacterPixelRefinement;
     public float fbxCharacterMoodBlend = GalFbxSceneController.DefaultCharacterMoodBlend;
+    public bool portraitPixelFilter = true;
     public bool fullscreen = true;
     public bool skipUnreadText;
     public string language = "zh-CN";
@@ -1252,6 +1262,10 @@ public class GalTextEntry
     public string portraitFacing;
     public string portraitAnimation;
     public string portraitPath;
+    public string portraitOffsetX;
+    public string portraitOffsetY;
+    public string portraitScale;
+    public string portraitCrop;
 }
 
 public class GalRawTextRow
@@ -1411,6 +1425,7 @@ public class GalTemplateRuntime : MonoBehaviour
     private RawImage backgroundImage;
     private AspectRatioFitter backgroundAspect;
     private GalPortraitController portraitController;
+    private GameObject portraitLayerRoot;
     private Coroutine sceneTransitionRoutine;
     private GameObject transitionRoot;
     private Image transitionImage;
@@ -1440,6 +1455,15 @@ public class GalTemplateRuntime : MonoBehaviour
     private Text dialogueText;
     private Text continueHintText;
     private Transform choiceContainer;
+    private GameObject externalDialogueRoot;
+    private Text normalSpeakerText;
+    private Text normalDialogueText;
+    private Text normalContinueHintText;
+    private Transform normalChoiceContainer;
+    private Text externalSpeakerText;
+    private Text externalDialogueText;
+    private Text externalContinueHintText;
+    private Transform externalChoiceContainer;
     private GameObject exploreRoot;
     private Transform exploreButtonContainer;
     private RectTransform exploreButtonAreaRect;
@@ -1531,6 +1555,7 @@ public class GalTemplateRuntime : MonoBehaviour
     private Text characterPixelSizeLabel;
     private Text characterPixelRefinementLabel;
     private Text characterMoodBlendLabel;
+    private Text characterPortraitPixelFilterLabel;
     private Text characterViewportXValueText;
     private Text characterViewportYValueText;
     private Text characterViewportDepthValueText;
@@ -1557,6 +1582,7 @@ public class GalTemplateRuntime : MonoBehaviour
     private Slider characterPixelSizeSlider;
     private Slider characterPixelRefinementSlider;
     private Slider characterMoodBlendSlider;
+    private Toggle characterPortraitPixelFilterToggle;
     private bool characterSettingsShowingImagePage;
     private GameObject portraitDebugRoot;
     private Text portraitDebugTitleText;
@@ -1905,10 +1931,15 @@ public class GalTemplateRuntime : MonoBehaviour
         isAutoMode = false;
         isSkipMode = false;
         isDialogueHidden = false;
+        BindNormalDialogueUi();
         mainMenuRoot.SetActive(false);
         hudRoot.SetActive(true);
         exploreRoot.SetActive(false);
         dialogueRoot.SetActive(true);
+        if (externalDialogueRoot != null)
+        {
+            externalDialogueRoot.SetActive(false);
+        }
         ClearChoices();
         RefreshModeLabels();
         SetBackground(story.defaultBackground);
@@ -2099,10 +2130,15 @@ public class GalTemplateRuntime : MonoBehaviour
         isAutoMode = false;
         isSkipMode = false;
         isDialogueHidden = false;
+        BindNormalDialogueUi();
         mainMenuRoot.SetActive(false);
         hudRoot.SetActive(true);
         exploreRoot.SetActive(false);
         dialogueRoot.SetActive(!isExploring);
+        if (externalDialogueRoot != null)
+        {
+            externalDialogueRoot.SetActive(false);
+        }
         ClearChoices();
         RefreshModeLabels();
         SetBackground(string.IsNullOrEmpty(data.currentBackgroundId) ? story.defaultBackground : data.currentBackgroundId);
@@ -2300,6 +2336,15 @@ public class GalTemplateRuntime : MonoBehaviour
 
     private void PlayNode(string nodeId)
     {
+        if (isExternalSceneDialogue)
+        {
+            BindExternalDialogueUi();
+        }
+        else
+        {
+            BindNormalDialogueUi();
+        }
+
         if (string.IsNullOrEmpty(nodeId) || !nodesById.TryGetValue(nodeId, out GalStoryNode node))
         {
             Debug.LogWarning("Missing story node: " + nodeId);
@@ -2327,7 +2372,14 @@ public class GalTemplateRuntime : MonoBehaviour
         ApplyNodePortrait(node);
         speakerText.text = string.IsNullOrEmpty(node.speaker) ? " " : node.speaker;
         currentLine = node.text ?? string.Empty;
-        dialogueRoot.SetActive(true);
+        if (isExternalSceneDialogue && externalDialogueRoot != null)
+        {
+            externalDialogueRoot.SetActive(true);
+        }
+        else
+        {
+            dialogueRoot.SetActive(true);
+        }
         StartTyping(currentLine);
     }
 
@@ -2496,7 +2548,8 @@ public class GalTemplateRuntime : MonoBehaviour
 
             if (result.gameObject.GetComponentInParent<Button>() != null ||
                 result.gameObject.GetComponentInParent<Slider>() != null ||
-                result.gameObject.GetComponentInParent<Toggle>() != null)
+                result.gameObject.GetComponentInParent<Toggle>() != null ||
+                result.gameObject.GetComponentInParent<InputField>() != null)
             {
                 return true;
             }
@@ -2549,6 +2602,7 @@ public class GalTemplateRuntime : MonoBehaviour
             return;
         }
 
+        portraitController.SetPixelFilterEnabled(settings.portraitPixelFilter);
         portraitController.Show(new GalPortraitPose
         {
             slot = node.portraitSlot,
@@ -2556,7 +2610,11 @@ public class GalTemplateRuntime : MonoBehaviour
             expression = node.portraitExpression,
             facing = node.portraitFacing,
             animation = node.portraitAnimation,
-            path = node.portraitPath
+            path = node.portraitPath,
+            offset = GetPortraitOffset(node),
+            scaleMultiplier = GetPortraitScale(node),
+            lowerMaskCutoff = GetPortraitCrop(node),
+            lowerMaskSoftness = 0.085f
         });
     }
 
@@ -2567,6 +2625,7 @@ public class GalTemplateRuntime : MonoBehaviour
             return;
         }
 
+        portraitController.SetPixelFilterEnabled(settings.portraitPixelFilter);
         portraitController.Show(new GalPortraitPose
         {
             slot = FirstNonEmpty(command.slot, command.key),
@@ -2574,7 +2633,11 @@ public class GalTemplateRuntime : MonoBehaviour
             expression = command.expression,
             facing = command.facing,
             animation = command.animation,
-            path = command.path
+            path = command.path,
+            offset = new Vector2(command.offsetX, command.offsetY),
+            scaleMultiplier = command.scale <= 0f ? 1f : command.scale,
+            lowerMaskCutoff = command.crop,
+            lowerMaskSoftness = 0.085f
         });
     }
 
@@ -2658,6 +2721,12 @@ public class GalTemplateRuntime : MonoBehaviour
             dialogueRoot.SetActive(false);
         }
 
+        if (externalDialogueRoot != null)
+        {
+            externalDialogueRoot.SetActive(false);
+        }
+        BindNormalDialogueUi();
+
         if (portraitController != null)
         {
             portraitController.HideAll();
@@ -2695,22 +2764,32 @@ public class GalTemplateRuntime : MonoBehaviour
     {
         if (!GalFbxSceneController.IsSceneActive || isExternalSceneDialogue || IsOverlayPageOpen())
         {
+            Debug.Log("GAL external dialogue request ignored: scene/dialogue/overlay state blocked.");
             return;
         }
 
         if (!string.Equals(characterId, GalFbxSceneController.DefaultCharacterImageId, StringComparison.OrdinalIgnoreCase))
         {
+            Debug.Log("GAL external dialogue request ignored: unknown character " + characterId);
             return;
         }
 
+        Debug.Log("GAL external dialogue request accepted: " + characterId);
         StartExternalSceneDialogue(CreateUnauthorizedPassengerTestNode());
     }
 
     private void StartExternalSceneDialogue(GalStoryNode node)
     {
-        if (node == null || dialogueRoot == null)
+        if (node == null || externalDialogueRoot == null)
         {
+            Debug.LogWarning("GAL external dialogue could not start: node or external dialogue UI is missing.");
             return;
+        }
+
+        if (GalFbxSceneController.IsSceneActive)
+        {
+            GalFbxSceneController.Instance.SetControlsEnabled(false);
+            GalFbxSceneController.Instance.SetDialogueFocus(true);
         }
 
         FinishTypingForMenu();
@@ -2724,13 +2803,22 @@ public class GalTemplateRuntime : MonoBehaviour
         isExploring = false;
         isDialogueHidden = false;
         isAwaitingChoice = false;
+        BindExternalDialogueUi();
         ClearChoices();
 
-        if (fbxHudRoot != null)
+        if (dialogueRoot != null)
         {
-            fbxHudRoot.SetActive(true);
+            dialogueRoot.SetActive(false);
         }
 
+        if (externalDialogueRoot != null)
+        {
+            externalDialogueRoot.SetActive(false);
+        }
+
+        SetExternalSceneHudVisible(false);
+
+        RefreshExternalSceneUiLayering();
         currentNode = node;
         currentNodeId = node.id;
         currentNodeCommandsExecuted = true;
@@ -2739,7 +2827,10 @@ public class GalTemplateRuntime : MonoBehaviour
         speakerText.text = string.IsNullOrEmpty(node.speaker) ? " " : node.speaker;
         currentLine = node.text ?? string.Empty;
         AddHistory(node);
-        dialogueRoot.SetActive(true);
+        ShowExternalScenePortrait(node);
+        externalDialogueRoot.SetActive(true);
+        RefreshExternalSceneUiLayering();
+        Debug.Log("GAL external dialogue opened.");
         StartTyping(currentLine);
     }
 
@@ -2766,13 +2857,17 @@ public class GalTemplateRuntime : MonoBehaviour
         externalSceneReturnNodeId = null;
         externalSceneDialogueOpenedFrame = -1;
 
-        if (dialogueRoot != null)
+        if (externalDialogueRoot != null)
         {
-            dialogueRoot.SetActive(false);
+            externalDialogueRoot.SetActive(false);
         }
+
+        HideExternalScenePortraits();
+        BindNormalDialogueUi();
 
         if (GalFbxSceneController.IsSceneActive)
         {
+            GalFbxSceneController.Instance.SetDialogueFocus(false);
             SetExternalSceneHudVisible(true);
             GalFbxSceneController.Instance.SetControlsEnabled(true);
         }
@@ -2780,12 +2875,25 @@ public class GalTemplateRuntime : MonoBehaviour
 
     private GalStoryNode CreateUnauthorizedPassengerTestNode()
     {
-        return new GalStoryNode
+        GalStoryNode node = new GalStoryNode
         {
             id = ExternalCharacterDialogueNodeId,
             speaker = GetUnauthorizedPassengerTestSpeaker(),
-            text = GetUnauthorizedPassengerTestText()
+            text = GetUnauthorizedPassengerTestText(),
+            portraitSlot = "left",
+            portraitCharacter = GalFbxSceneController.DefaultCharacterImageId,
+            portraitExpression = "neutral",
+            portraitFacing = "auto",
+            portraitAnimation = "peek_left",
+            portraitPath = "resources:Characters/" + GalFbxSceneController.DefaultCharacterImageId,
+            portraitOffsetX = "-120",
+            portraitOffsetY = "-20",
+            portraitScale = "1.12",
+            portraitCrop = "0.30"
         };
+
+        ApplyTextEntryToNode(node, "node." + ExternalCharacterDialogueNodeId);
+        return node;
     }
 
     private string GetUnauthorizedPassengerTestSpeaker()
@@ -2818,6 +2926,102 @@ public class GalTemplateRuntime : MonoBehaviour
         }
     }
 
+    private void ShowExternalScenePortrait(GalStoryNode node)
+    {
+        if (portraitController == null || node == null)
+        {
+            return;
+        }
+
+        portraitController.SetPixelFilterEnabled(settings.portraitPixelFilter);
+        portraitController.Show(new GalPortraitPose
+        {
+            slot = FirstNonEmpty(node.portraitSlot, "left"),
+            character = FirstNonEmpty(node.portraitCharacter, GalFbxSceneController.DefaultCharacterImageId),
+            expression = FirstNonEmpty(node.portraitExpression, "neutral"),
+            facing = FirstNonEmpty(node.portraitFacing, "auto"),
+            animation = FirstNonEmpty(node.portraitAnimation, "fade"),
+            path = node.portraitPath,
+            offset = GetExternalScenePortraitOffset(node),
+            scaleMultiplier = GetExternalScenePortraitScale(node),
+            lowerMaskCutoff = GetExternalScenePortraitLowerMask(node),
+            lowerMaskSoftness = 0.085f
+        });
+    }
+
+    private static Vector2 GetExternalScenePortraitOffset(GalStoryNode node)
+    {
+        string slot = GalPortraitController.NormalizeSlot(node == null ? null : node.portraitSlot);
+        Vector2 fallback = slot == "left" ? new Vector2(-120f, -20f) : Vector2.zero;
+        return GetPortraitOffset(node, fallback);
+    }
+
+    private static float GetExternalScenePortraitScale(GalStoryNode node)
+    {
+        string slot = GalPortraitController.NormalizeSlot(node == null ? null : node.portraitSlot);
+        float fallback = slot == "left" ? 1.12f : 1f;
+        return GetPortraitScale(node, fallback);
+    }
+
+    private static float GetExternalScenePortraitLowerMask(GalStoryNode node)
+    {
+        string character = node == null ? null : node.portraitCharacter;
+        float fallback = -1f;
+        if (string.Equals(character, GalFbxSceneController.DefaultCharacterImageId, StringComparison.OrdinalIgnoreCase))
+        {
+            fallback = 0.3f;
+        }
+
+        return GetPortraitCrop(node, fallback);
+    }
+
+    private static Vector2 GetPortraitOffset(GalStoryNode node)
+    {
+        return GetPortraitOffset(node, Vector2.zero);
+    }
+
+    private static Vector2 GetPortraitOffset(GalStoryNode node, Vector2 fallback)
+    {
+        if (node == null)
+        {
+            return fallback;
+        }
+
+        float x = ParseFloatOrDefault(node.portraitOffsetX, fallback.x);
+        float y = ParseFloatOrDefault(node.portraitOffsetY, fallback.y);
+        return new Vector2(x, y);
+    }
+
+    private static float GetPortraitScale(GalStoryNode node)
+    {
+        return GetPortraitScale(node, 1f);
+    }
+
+    private static float GetPortraitScale(GalStoryNode node, float fallback)
+    {
+        float scale = ParseFloatOrDefault(node == null ? null : node.portraitScale, fallback);
+        return scale <= 0f ? fallback : Mathf.Clamp(scale, 0.1f, 4f);
+    }
+
+    private static float GetPortraitCrop(GalStoryNode node)
+    {
+        return GetPortraitCrop(node, -1f);
+    }
+
+    private static float GetPortraitCrop(GalStoryNode node, float fallback)
+    {
+        float crop = ParseFloatOrDefault(node == null ? null : node.portraitCrop, fallback);
+        return crop < 0f ? -1f : Mathf.Clamp01(crop);
+    }
+
+    private void HideExternalScenePortraits()
+    {
+        if (portraitController != null)
+        {
+            portraitController.HideAll();
+        }
+    }
+
     private void SetGalSceneLayersVisible(bool visible)
     {
         if (backgroundRoot != null)
@@ -2837,6 +3041,31 @@ public class GalTemplateRuntime : MonoBehaviour
         {
             fbxHudRoot.SetActive(visible);
         }
+
+        if (!visible && externalDialogueRoot != null)
+        {
+            externalDialogueRoot.SetActive(false);
+        }
+
+        RefreshExternalSceneUiLayering();
+    }
+
+    private void RefreshExternalSceneUiLayering()
+    {
+        if (fbxHudRoot != null && fbxHudRoot.activeSelf)
+        {
+            fbxHudRoot.transform.SetAsLastSibling();
+        }
+
+        if (portraitLayerRoot != null && isExternalSceneDialogue)
+        {
+            portraitLayerRoot.transform.SetAsLastSibling();
+        }
+
+        if (externalDialogueRoot != null && externalDialogueRoot.activeSelf)
+        {
+            externalDialogueRoot.transform.SetAsLastSibling();
+        }
     }
 
     private void ShowExplore()
@@ -2847,7 +3076,12 @@ public class GalTemplateRuntime : MonoBehaviour
         currentNode = null;
         isAwaitingChoice = false;
         isDialogueHidden = false;
+        BindNormalDialogueUi();
         dialogueRoot.SetActive(false);
+        if (externalDialogueRoot != null)
+        {
+            externalDialogueRoot.SetActive(false);
+        }
         exploreRoot.SetActive(true);
         if (portraitController != null)
         {
@@ -2956,7 +3190,12 @@ public class GalTemplateRuntime : MonoBehaviour
         if (string.IsNullOrEmpty(point.nodeId))
         {
             isExploring = true;
+            BindNormalDialogueUi();
             dialogueRoot.SetActive(false);
+            if (externalDialogueRoot != null)
+            {
+                externalDialogueRoot.SetActive(false);
+            }
             exploreRoot.SetActive(true);
             RebuildExploreButtons();
             yield break;
@@ -3221,25 +3460,27 @@ public class GalTemplateRuntime : MonoBehaviour
 
     private void HideDialogueWindow()
     {
-        if (dialogueRoot == null)
+        GameObject targetRoot = isExternalSceneDialogue ? externalDialogueRoot : dialogueRoot;
+        if (targetRoot == null)
         {
             return;
         }
 
         isDialogueHidden = true;
-        dialogueRoot.SetActive(false);
+        targetRoot.SetActive(false);
         CancelAutoAdvance();
     }
 
     private void ShowDialogueWindow()
     {
-        if (dialogueRoot == null || isExploring)
+        GameObject targetRoot = isExternalSceneDialogue ? externalDialogueRoot : dialogueRoot;
+        if (targetRoot == null || (!isExternalSceneDialogue && isExploring))
         {
             return;
         }
 
         isDialogueHidden = false;
-        dialogueRoot.SetActive(true);
+        targetRoot.SetActive(true);
         QueueAutoOrSkipAdvance();
     }
 
@@ -3624,6 +3865,10 @@ public class GalTemplateRuntime : MonoBehaviour
             entry.portraitFacing = GetLocalizedCell(row, "portrait_facing");
             entry.portraitAnimation = GetLocalizedCell(row, "portrait_animation");
             entry.portraitPath = GetLocalizedCell(row, "portrait_path");
+            entry.portraitOffsetX = GetLocalizedCell(row, "portrait_offset_x");
+            entry.portraitOffsetY = GetLocalizedCell(row, "portrait_offset_y");
+            entry.portraitScale = GetLocalizedCell(row, "portrait_scale");
+            entry.portraitCrop = GetLocalizedCell(row, "portrait_crop");
             textEntriesByKey[row.key] = entry;
         }
     }
@@ -3697,48 +3942,7 @@ public class GalTemplateRuntime : MonoBehaviour
                 continue;
             }
 
-            if (textEntriesByKey.TryGetValue("node." + node.id, out GalTextEntry nodeEntry))
-            {
-                if (!string.IsNullOrEmpty(nodeEntry.speaker))
-                {
-                    node.speaker = nodeEntry.speaker;
-                }
-
-                if (!string.IsNullOrEmpty(nodeEntry.text))
-                {
-                    node.text = nodeEntry.text;
-                }
-
-                if (!string.IsNullOrEmpty(nodeEntry.portraitSlot))
-                {
-                    node.portraitSlot = nodeEntry.portraitSlot;
-                }
-
-                if (!string.IsNullOrEmpty(nodeEntry.portraitCharacter))
-                {
-                    node.portraitCharacter = nodeEntry.portraitCharacter;
-                }
-
-                if (!string.IsNullOrEmpty(nodeEntry.portraitExpression))
-                {
-                    node.portraitExpression = nodeEntry.portraitExpression;
-                }
-
-                if (!string.IsNullOrEmpty(nodeEntry.portraitFacing))
-                {
-                    node.portraitFacing = nodeEntry.portraitFacing;
-                }
-
-                if (!string.IsNullOrEmpty(nodeEntry.portraitAnimation))
-                {
-                    node.portraitAnimation = nodeEntry.portraitAnimation;
-                }
-
-                if (!string.IsNullOrEmpty(nodeEntry.portraitPath))
-                {
-                    node.portraitPath = nodeEntry.portraitPath;
-                }
-            }
+            ApplyTextEntryToNode(node, "node." + node.id);
 
             if (node.choices == null)
             {
@@ -3903,6 +4107,74 @@ public class GalTemplateRuntime : MonoBehaviour
             image.color = image.sprite == null
                 ? selected ? new Color(0.96f, 0.84f, 1f, 0.78f) : UiGlassNormal
                 : selected ? new Color(1f, 0.9f, 1f, 0.86f) : new Color(1f, 1f, 1f, 0.92f);
+        }
+    }
+
+    private void ApplyTextEntryToNode(GalStoryNode node, string textKey)
+    {
+        if (node == null || string.IsNullOrEmpty(textKey) || !textEntriesByKey.TryGetValue(textKey, out GalTextEntry entry))
+        {
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(entry.speaker))
+        {
+            node.speaker = entry.speaker;
+        }
+
+        if (!string.IsNullOrEmpty(entry.text))
+        {
+            node.text = entry.text;
+        }
+
+        if (!string.IsNullOrEmpty(entry.portraitSlot))
+        {
+            node.portraitSlot = entry.portraitSlot;
+        }
+
+        if (!string.IsNullOrEmpty(entry.portraitCharacter))
+        {
+            node.portraitCharacter = entry.portraitCharacter;
+        }
+
+        if (!string.IsNullOrEmpty(entry.portraitExpression))
+        {
+            node.portraitExpression = entry.portraitExpression;
+        }
+
+        if (!string.IsNullOrEmpty(entry.portraitFacing))
+        {
+            node.portraitFacing = entry.portraitFacing;
+        }
+
+        if (!string.IsNullOrEmpty(entry.portraitAnimation))
+        {
+            node.portraitAnimation = entry.portraitAnimation;
+        }
+
+        if (!string.IsNullOrEmpty(entry.portraitPath))
+        {
+            node.portraitPath = entry.portraitPath;
+        }
+
+        if (!string.IsNullOrEmpty(entry.portraitOffsetX))
+        {
+            node.portraitOffsetX = entry.portraitOffsetX;
+        }
+
+        if (!string.IsNullOrEmpty(entry.portraitOffsetY))
+        {
+            node.portraitOffsetY = entry.portraitOffsetY;
+        }
+
+        if (!string.IsNullOrEmpty(entry.portraitScale))
+        {
+            node.portraitScale = entry.portraitScale;
+        }
+
+        if (!string.IsNullOrEmpty(entry.portraitCrop))
+        {
+            node.portraitCrop = entry.portraitCrop;
         }
     }
 
@@ -4376,6 +4648,7 @@ public class GalTemplateRuntime : MonoBehaviour
         BuildPortraitLayer(canvasObject.transform);
         BuildMainMenu(canvasObject.transform);
         BuildDialogue(canvasObject.transform);
+        BuildExternalSceneDialogue(canvasObject.transform);
         BuildExplore(canvasObject.transform);
         BuildHud(canvasObject.transform);
         BuildExternalSceneHud(canvasObject.transform);
@@ -4418,9 +4691,11 @@ public class GalTemplateRuntime : MonoBehaviour
     private void BuildPortraitLayer(Transform parent)
     {
         GameObject layer = CreateUiObject("Portrait Layer", parent);
+        portraitLayerRoot = layer;
         portraitController = layer.AddComponent<GalPortraitController>();
         portraitController.Initialize(GetFont(24));
         portraitController.Configure(story.portraits);
+        portraitController.SetPixelFilterEnabled(settings.portraitPixelFilter);
     }
 
     private void BuildMainMenu(Transform parent)
@@ -5033,6 +5308,89 @@ public class GalTemplateRuntime : MonoBehaviour
         choiceLayout.childForceExpandHeight = false;
 
         dialogueRoot.SetActive(false);
+        normalSpeakerText = speakerText;
+        normalDialogueText = dialogueText;
+        normalContinueHintText = continueHintText;
+        normalChoiceContainer = choiceContainer;
+        BindNormalDialogueUi();
+    }
+
+    private void BuildExternalSceneDialogue(Transform parent)
+    {
+        externalDialogueRoot = CreateUiObject("External Scene Dialogue", parent);
+        RectTransform rootRect = externalDialogueRoot.GetComponent<RectTransform>();
+        rootRect.anchorMin = new Vector2(0f, 0f);
+        rootRect.anchorMax = new Vector2(1f, 0f);
+        rootRect.pivot = new Vector2(0.5f, 0f);
+        rootRect.offsetMin = new Vector2(188f, 46f);
+        rootRect.offsetMax = new Vector2(-116f, 238f);
+
+        Image panelImage = externalDialogueRoot.AddComponent<Image>();
+        panelImage.color = new Color(0.045f, 0.035f, 0.075f, 0.72f);
+
+        Shadow panelShadow = externalDialogueRoot.AddComponent<Shadow>();
+        panelShadow.effectColor = new Color(0.02f, 0.015f, 0.04f, 0.46f);
+        panelShadow.effectDistance = new Vector2(10f, -10f);
+
+        externalSpeakerText = CreateText(externalDialogueRoot.transform, string.Empty, 25, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.94f, 0.86f, 1f, 0.96f));
+        RectTransform speakerRect = externalSpeakerText.GetComponent<RectTransform>();
+        speakerRect.anchorMin = new Vector2(0f, 1f);
+        speakerRect.anchorMax = new Vector2(0.42f, 1f);
+        speakerRect.pivot = new Vector2(0f, 1f);
+        speakerRect.offsetMin = new Vector2(56f, -62f);
+        speakerRect.offsetMax = new Vector2(0f, -16f);
+        AddTextShadow(externalSpeakerText, new Color(0.04f, 0.02f, 0.08f, 0.65f), new Vector2(2f, -2f));
+
+        externalDialogueText = CreateText(externalDialogueRoot.transform, string.Empty, 29, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.98f, 0.94f, 1f, 0.96f));
+        externalDialogueText.resizeTextForBestFit = false;
+        externalDialogueText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        externalDialogueText.verticalOverflow = VerticalWrapMode.Truncate;
+        RectTransform lineRect = externalDialogueText.GetComponent<RectTransform>();
+        lineRect.anchorMin = new Vector2(0f, 0f);
+        lineRect.anchorMax = new Vector2(1f, 1f);
+        lineRect.offsetMin = new Vector2(56f, 42f);
+        lineRect.offsetMax = new Vector2(-360f, -70f);
+        AddTextShadow(externalDialogueText, new Color(0.04f, 0.02f, 0.08f, 0.7f), new Vector2(2f, -2f));
+
+        externalContinueHintText = CreateText(externalDialogueRoot.transform, T("ui.dialogue.continue", "点击或空格继续"), 18, FontStyle.Normal, TextAnchor.LowerRight, new Color(0.94f, 0.86f, 1f, 0.74f));
+        RectTransform hintRect = externalContinueHintText.GetComponent<RectTransform>();
+        hintRect.anchorMin = new Vector2(1f, 0f);
+        hintRect.anchorMax = new Vector2(1f, 0f);
+        hintRect.pivot = new Vector2(1f, 0f);
+        hintRect.sizeDelta = new Vector2(320f, 34f);
+        hintRect.anchoredPosition = new Vector2(-34f, 20f);
+
+        GameObject choices = CreateUiObject("External Choices", externalDialogueRoot.transform);
+        externalChoiceContainer = choices.transform;
+        RectTransform choiceRect = choices.GetComponent<RectTransform>();
+        choiceRect.anchorMin = new Vector2(1f, 0f);
+        choiceRect.anchorMax = new Vector2(1f, 1f);
+        choiceRect.pivot = new Vector2(1f, 0.5f);
+        choiceRect.offsetMin = new Vector2(-336f, 56f);
+        choiceRect.offsetMax = new Vector2(-30f, -38f);
+        VerticalLayoutGroup choiceLayout = choices.AddComponent<VerticalLayoutGroup>();
+        choiceLayout.spacing = 10f;
+        choiceLayout.childControlWidth = true;
+        choiceLayout.childControlHeight = false;
+        choiceLayout.childForceExpandHeight = false;
+
+        externalDialogueRoot.SetActive(false);
+    }
+
+    private void BindNormalDialogueUi()
+    {
+        speakerText = normalSpeakerText;
+        dialogueText = normalDialogueText;
+        continueHintText = normalContinueHintText;
+        choiceContainer = normalChoiceContainer;
+    }
+
+    private void BindExternalDialogueUi()
+    {
+        speakerText = externalSpeakerText;
+        dialogueText = externalDialogueText;
+        continueHintText = externalContinueHintText;
+        choiceContainer = externalChoiceContainer;
     }
 
     private void BuildExplore(Transform parent)
@@ -5667,6 +6025,17 @@ public class GalTemplateRuntime : MonoBehaviour
             ApplyCharacterSettings();
         });
 
+        characterPortraitPixelFilterToggle = CreateSettingsToggle(characterPositionPage.transform, T("ui.character.portrait_pixel_filter", "界面立绘像素化"), new Vector2(780f, -562f), settings.portraitPixelFilter, out characterPortraitPixelFilterLabel);
+        characterPortraitPixelFilterToggle.onValueChanged.AddListener(delegate(bool value)
+        {
+            settings.portraitPixelFilter = value;
+            if (portraitController != null)
+            {
+                portraitController.SetPixelFilterEnabled(value);
+            }
+            SaveSettings();
+        });
+
         characterImagePage = CreateUiObject("Character Image Page", panel.transform);
         Stretch(characterImagePage.GetComponent<RectTransform>());
 
@@ -5786,6 +6155,11 @@ public class GalTemplateRuntime : MonoBehaviour
         hudRoot.SetActive(false);
         exploreRoot.SetActive(false);
         dialogueRoot.SetActive(false);
+        if (externalDialogueRoot != null)
+        {
+            externalDialogueRoot.SetActive(false);
+        }
+        BindNormalDialogueUi();
         CloseOverlayPages(true);
         if (portraitController != null)
         {
@@ -5986,6 +6360,7 @@ public class GalTemplateRuntime : MonoBehaviour
         SetText(characterPixelSizeLabel, T("ui.character.pixel_size", "像素尺寸"));
         SetText(characterPixelRefinementLabel, T("ui.character.pixel_refinement", "像素细化"));
         SetText(characterMoodBlendLabel, T("ui.character.mood_blend", "融合程度"));
+        SetText(characterPortraitPixelFilterLabel, T("ui.character.portrait_pixel_filter", "界面立绘像素化"));
         SetText(characterImportPathLabel, T("ui.character.import_path", "本地图片路径"));
         SetInputPlaceholder(characterImportPathInput, T("ui.character.import_path_placeholder", "粘贴 png / jpg / jpeg 文件路径"));
         SetText(characterImportButtonLabel, T("ui.character.import_from_path", "导入路径"));
@@ -6002,6 +6377,10 @@ public class GalTemplateRuntime : MonoBehaviour
         characterPixelSizeSlider.SetValueWithoutNotify(settings.fbxCharacterPixelSize);
         characterPixelRefinementSlider.SetValueWithoutNotify(settings.fbxCharacterPixelRefinement);
         characterMoodBlendSlider.SetValueWithoutNotify(settings.fbxCharacterMoodBlend);
+        if (characterPortraitPixelFilterToggle != null)
+        {
+            characterPortraitPixelFilterToggle.SetIsOnWithoutNotify(settings.portraitPixelFilter);
+        }
 
         characterViewportXValueText.text = FormatViewport(settings.fbxCharacterViewportX);
         characterViewportYValueText.text = FormatViewport(settings.fbxCharacterViewportY);
@@ -6028,6 +6407,7 @@ public class GalTemplateRuntime : MonoBehaviour
         SetText(characterPixelSizeLabel, T("ui.character.pixel_size", "像素尺寸"));
         SetText(characterPixelRefinementLabel, T("ui.character.pixel_refinement", "像素细化"));
         SetText(characterMoodBlendLabel, T("ui.character.mood_blend", "融合程度"));
+        SetText(characterPortraitPixelFilterLabel, T("ui.character.portrait_pixel_filter", "界面立绘像素化"));
         SetText(characterImportPathLabel, T("ui.character.import_path", "本地图片路径"));
         SetInputPlaceholder(characterImportPathInput, T("ui.character.import_path_placeholder", "粘贴 png / jpg / jpeg 文件路径"));
         SetText(characterImportButtonLabel, T("ui.character.import_from_path", "导入路径"));
@@ -6456,6 +6836,7 @@ public class GalTemplateRuntime : MonoBehaviour
         settings.fbxCharacterPixelSize = PlayerPrefs.GetFloat("GalTemplate.FbxCharacterPixelSize", settings.fbxCharacterPixelSize);
         settings.fbxCharacterPixelRefinement = PlayerPrefs.GetFloat("GalTemplate.FbxCharacterPixelRefinement", settings.fbxCharacterPixelRefinement);
         settings.fbxCharacterMoodBlend = PlayerPrefs.GetFloat("GalTemplate.FbxCharacterMoodBlend", settings.fbxCharacterMoodBlend);
+        settings.portraitPixelFilter = PlayerPrefs.GetInt("GalTemplate.PortraitPixelFilter", settings.portraitPixelFilter ? 1 : 0) == 1;
         settings.fullscreen = PlayerPrefs.GetInt("GalTemplate.Fullscreen", settings.fullscreen ? 1 : 0) == 1;
         settings.skipUnreadText = PlayerPrefs.GetInt("GalTemplate.SkipUnreadText", settings.skipUnreadText ? 1 : 0) == 1;
         settings.language = PlayerPrefs.GetString("GalTemplate.Language", settings.language);
@@ -6480,6 +6861,7 @@ public class GalTemplateRuntime : MonoBehaviour
         PlayerPrefs.SetFloat("GalTemplate.FbxCharacterPixelSize", settings.fbxCharacterPixelSize);
         PlayerPrefs.SetFloat("GalTemplate.FbxCharacterPixelRefinement", settings.fbxCharacterPixelRefinement);
         PlayerPrefs.SetFloat("GalTemplate.FbxCharacterMoodBlend", settings.fbxCharacterMoodBlend);
+        PlayerPrefs.SetInt("GalTemplate.PortraitPixelFilter", settings.portraitPixelFilter ? 1 : 0);
         PlayerPrefs.SetInt("GalTemplate.Fullscreen", settings.fullscreen ? 1 : 0);
         PlayerPrefs.SetInt("GalTemplate.SkipUnreadText", settings.skipUnreadText ? 1 : 0);
         PlayerPrefs.SetString("GalTemplate.Language", settings.language);
@@ -6496,6 +6878,11 @@ public class GalTemplateRuntime : MonoBehaviour
         ApplyBgmVolume();
         Screen.fullScreen = settings.fullscreen;
         ApplyTitleSaturation();
+        if (portraitController != null)
+        {
+            portraitController.SetPixelFilterEnabled(settings.portraitPixelFilter);
+        }
+
         GalFbxSceneController controller = GalFbxSceneController.Instance;
         controller.SetCameraHeightOffset(settings.fbxCameraHeight);
         controller.SetMoodIntensity(settings.cabinMoodIntensity);
@@ -7151,5 +7538,26 @@ public class GalTemplateRuntime : MonoBehaviour
         }
 
         return second;
+    }
+
+    private static float ParseFloatOrDefault(string value, float fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        string trimmed = value.Trim();
+        if (float.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out float invariantValue))
+        {
+            return invariantValue;
+        }
+
+        if (float.TryParse(trimmed, NumberStyles.Float, CultureInfo.CurrentCulture, out float localValue))
+        {
+            return localValue;
+        }
+
+        return fallback;
     }
 }

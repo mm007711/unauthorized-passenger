@@ -1,4 +1,4 @@
-﻿category,key,description,speaker,text,portrait_slot,portrait_character,portrait_expression,portrait_facing,portrait_animation,portrait_path,note
+category,key,description,speaker,text,portrait_slot,portrait_character,portrait_expression,portrait_facing,portrait_animation,portrait_path,portrait_offset_x,portrait_offset_y,portrait_scale,portrait_crop,note
 system,game.title,Game title shown on the main menu.,,unauthorized-passenger,,,,,,,
 ui,ui.main.start,Runtime UI text.,,Start,,,,,,,
 ui,ui.main.continue,Runtime UI text.,,Continue,,,,,,,
@@ -136,3 +136,4 @@ story,node.mirror_001,Story node text and optional portrait cue.,Test Speaker,En
 ui,ui.save.location_explore,Runtime UI text.,,Exploring,,,,,,,
 ui,ui.save.location_dialogue,Runtime UI text.,,Dialogue,,,,,,,
 ui,ui.settings.bgm_volume,Runtime UI text.,,BGM Volume,,,,,,,
+story,node.__fbx_unauthorized_passenger_test_dialogue,3D bus external dialogue and portrait cue.,Unauthorized Passenger,Test placeholder dialogue. You found the passenger peeking out from behind the seat.,left,unauthorized_passenger,neutral,auto,peek_left,resources:Characters/unauthorized_passenger,-120,-20,1.12,0.30,

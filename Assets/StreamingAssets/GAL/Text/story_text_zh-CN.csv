@@ -1,4 +1,4 @@
-﻿category,key,description,speaker,text,portrait_slot,portrait_character,portrait_expression,portrait_facing,portrait_animation,portrait_path,note
+category,key,description,speaker,text,portrait_slot,portrait_character,portrait_expression,portrait_facing,portrait_animation,portrait_path,portrait_offset_x,portrait_offset_y,portrait_scale,portrait_crop,note
 system,game.title,Game title shown on the main menu.,,未许客,,,,,,,
 ui,ui.main.start,Runtime UI text.,,开始游戏,,,,,,,
 ui,ui.main.continue,Runtime UI text.,,继续游戏,,,,,,,
@@ -138,3 +138,4 @@ story,node.mirror_001,Story node text and optional portrait cue.,测试角色,�
 ui,ui.save.location_explore,Runtime UI text.,,探索中,,,,,,,
 ui,ui.save.location_dialogue,Runtime UI text.,,对话中,,,,,,,
 ui,ui.settings.bgm_volume,Runtime UI text.,,音乐音量,,,,,,,
+story,node.__fbx_unauthorized_passenger_test_dialogue,3D bus external dialogue and portrait cue.,未许客,测试占位文案。你发现了从座椅侧面探出头来的未许客。,left,unauthorized_passenger,neutral,auto,peek_left,resources:Characters/unauthorized_passenger,-120,-20,1.12,0.30,

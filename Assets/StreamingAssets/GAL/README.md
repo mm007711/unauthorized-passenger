@@ -12,13 +12,14 @@ Edit the separated text CSV files for visible writing and per-language portrait 
 Current single-language columns:
 
 ```csv
-category,key,description,speaker,text,portrait_slot,portrait_character,portrait_expression,portrait_facing,portrait_animation,portrait_path,note
+category,key,description,speaker,text,portrait_slot,portrait_character,portrait_expression,portrait_facing,portrait_animation,portrait_path,portrait_offset_x,portrait_offset_y,portrait_scale,portrait_crop,note
 ```
 
 Important keys:
 
 - `game.title`: menu title.
 - `node.<nodeId>`: speaker, dialogue text, and optional portrait cue.
+- `node.__fbx_unauthorized_passenger_test_dialogue`: 3D bus overlay dialogue and its portrait cue.
 - `choice.<nodeId>.<01>`: choice text by node and order.
 - `choice.<choiceId>`: choice text by custom choice id.
 - `explore.<pointId>`: hotspot label.
@@ -44,6 +45,10 @@ Portrait CSV fields:
 - `portrait_facing`: `auto`, `left`, or `right`.
 - `portrait_animation`: `none`, `fade`, `shake`, `bounce`, or `pop`.
 - `portrait_path`: optional explicit image path.
+- `portrait_offset_x`: horizontal offset in reference-canvas pixels. Positive moves right, negative moves left.
+- `portrait_offset_y`: vertical offset in reference-canvas pixels. Positive moves up, negative moves down.
+- `portrait_scale`: portrait size multiplier. `1` is the slot default.
+- `portrait_crop`: lower-body crop line from `0` to `1`; blank or negative disables it. Higher values hide more from the bottom.
 
 Commands also support portraits:
 

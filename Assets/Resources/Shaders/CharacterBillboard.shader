@@ -15,6 +15,11 @@ Shader "GalTemplate/CharacterBillboard"
         _RimStrength ("Rim Strength", Range(0, 1)) = 0.12
         _PixelSize ("Character Pixel Size", Range(1, 24)) = 1
         _PixelRefinement ("Character Pixel Refinement", Range(1, 4)) = 2
+        _LowerMaskCutoff ("Lower Mask Cutoff", Range(-0.1, 1)) = -0.1
+        _LowerMaskSoftness ("Lower Mask Softness", Range(0.001, 0.3)) = 0.06
+        _OutlineColor ("Outline Color", Color) = (0.75, 0.58, 1, 1)
+        _OutlineStrength ("Outline Strength", Range(0, 2)) = 0
+        _OutlineSize ("Outline Size", Range(0, 8)) = 2
         _ZTest ("ZTest", Float) = 4
     }
 
@@ -55,6 +60,24 @@ Shader "GalTemplate/CharacterBillboard"
             float _RimStrength;
             float _PixelSize;
             float _PixelRefinement;
+            float _LowerMaskCutoff;
+            float _LowerMaskSoftness;
+            float4 _OutlineColor;
+            float _OutlineStrength;
+            float _OutlineSize;
+
+            float ComputeKeyedAlpha(float2 sampleUv)
+            {
+                fixed4 sampleColor = tex2D(_MainTex, sampleUv);
+                float maxChannel = max(sampleColor.r, max(sampleColor.g, sampleColor.b));
+                float minChannel = min(sampleColor.r, min(sampleColor.g, sampleColor.b));
+                float saturation = maxChannel - minChannel;
+                float whiteKey = smoothstep(_WhiteCutoff, _WhiteCutoff + _WhiteSoftness, minChannel);
+                whiteKey *= 1.0 - smoothstep(0.045, 0.2, saturation);
+                float blackKey = 1.0 - smoothstep(_BlackCutoff, _BlackCutoff + _BlackSoftness, maxChannel);
+                blackKey *= 1.0 - smoothstep(0.02, 0.14, saturation);
+                return sampleColor.a * (1.0 - saturate(whiteKey + blackKey));
+            }
 
             struct appdata
             {
@@ -98,8 +121,27 @@ Shader "GalTemplate/CharacterBillboard"
                 float blackKey = 1.0 - smoothstep(_BlackCutoff, _BlackCutoff + _BlackSoftness, maxChannel);
                 blackKey *= 1.0 - smoothstep(0.02, 0.14, saturation);
 
-                float alpha = source.a * _Opacity * (1.0 - saturate(whiteKey + blackKey));
-                clip(alpha - 0.01);
+                float lowerMask = smoothstep(_LowerMaskCutoff, _LowerMaskCutoff + max(0.001, _LowerMaskSoftness), input.uv.y);
+                float keyedAlpha = source.a * (1.0 - saturate(whiteKey + blackKey));
+                float alpha = keyedAlpha * _Opacity * lowerMask;
+
+                float outlineStep = max(0.0, _OutlineSize) * max(_MainTex_TexelSize.x, _MainTex_TexelSize.y);
+                float outlineSource = keyedAlpha;
+                if (_OutlineStrength > 0.001 && outlineStep > 0.0)
+                {
+                    outlineSource = max(outlineSource, ComputeKeyedAlpha(uv + float2(outlineStep, 0.0)));
+                    outlineSource = max(outlineSource, ComputeKeyedAlpha(uv + float2(-outlineStep, 0.0)));
+                    outlineSource = max(outlineSource, ComputeKeyedAlpha(uv + float2(0.0, outlineStep)));
+                    outlineSource = max(outlineSource, ComputeKeyedAlpha(uv + float2(0.0, -outlineStep)));
+                    outlineSource = max(outlineSource, ComputeKeyedAlpha(uv + float2(outlineStep, outlineStep)));
+                    outlineSource = max(outlineSource, ComputeKeyedAlpha(uv + float2(-outlineStep, outlineStep)));
+                    outlineSource = max(outlineSource, ComputeKeyedAlpha(uv + float2(outlineStep, -outlineStep)));
+                    outlineSource = max(outlineSource, ComputeKeyedAlpha(uv + float2(-outlineStep, -outlineStep)));
+                }
+
+                float outlineMask = saturate(outlineSource - keyedAlpha);
+                float outlineAlpha = outlineMask * _OutlineStrength * _Opacity * lowerMask;
+                clip(max(alpha, outlineAlpha) - 0.01);
 
                 float2 centeredUv = abs(input.uv - 0.5) * 2.0;
                 float edge = smoothstep(0.28, 1.0, max(centeredUv.x, centeredUv.y));
@@ -114,8 +156,10 @@ Shader "GalTemplate/CharacterBillboard"
                 color = lerp(color, color * 0.72 + _MoodTint.rgb * 0.08, edge * _EdgeDarkness);
                 color += _MoodTint.rgb * _RimStrength * edge * smoothstep(0.32, 0.86, luminance);
                 color = lerp(color, color * 0.88, verticalShade * 0.08);
+                color = lerp(_OutlineColor.rgb, color, saturate(alpha * 12.0));
+                color += _OutlineColor.rgb * outlineAlpha * 0.45;
 
-                return fixed4(saturate(color), alpha);
+                return fixed4(saturate(color), saturate(alpha + outlineAlpha));
             }
             ENDCG
         }

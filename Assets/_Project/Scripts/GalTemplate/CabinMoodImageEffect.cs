@@ -65,3 +65,89 @@ public class CabinMoodImageEffect : MonoBehaviour
         moodMaterial = null;
     }
 }
+
+[ExecuteInEditMode]
+public class DialogueFocusImageEffect : MonoBehaviour
+{
+    private const string ShaderResourcePath = "Shaders/DialogueFocus";
+
+    [Range(0f, 1f)]
+    public float targetIntensity;
+
+    [Range(0f, 1f)]
+    public float currentIntensity;
+
+    [Range(0.5f, 8f)]
+    public float blurPixels = 3.5f;
+
+    private Material focusMaterial;
+
+    private void OnRenderImage(RenderTexture source, RenderTexture destination)
+    {
+        currentIntensity = Application.isPlaying
+            ? Mathf.MoveTowards(currentIntensity, targetIntensity, Time.unscaledDeltaTime * 4f)
+            : targetIntensity;
+
+        if (currentIntensity <= 0.001f)
+        {
+            Graphics.Blit(source, destination);
+            return;
+        }
+
+        EnsureMaterial();
+        if (focusMaterial == null)
+        {
+            Graphics.Blit(source, destination);
+            return;
+        }
+
+        float intensity = Mathf.Clamp01(currentIntensity);
+        focusMaterial.SetFloat("_Intensity", intensity);
+        focusMaterial.SetFloat("_BlurSize", blurPixels);
+        focusMaterial.SetFloat("_Darken", 0.18f);
+        focusMaterial.SetColor("_Tint", new Color(0.09f, 0.055f, 0.14f, 0.18f));
+        Graphics.Blit(source, destination, focusMaterial);
+    }
+
+    private void EnsureMaterial()
+    {
+        if (focusMaterial != null)
+        {
+            return;
+        }
+
+        Shader shader = Resources.Load<Shader>(ShaderResourcePath);
+        if (shader == null)
+        {
+            shader = Shader.Find("Hidden/GalTemplate/DialogueFocus");
+        }
+
+        if (shader == null)
+        {
+            Debug.LogWarning("DialogueFocusImageEffect missing shader: " + ShaderResourcePath);
+            return;
+        }
+
+        focusMaterial = new Material(shader);
+        focusMaterial.hideFlags = HideFlags.HideAndDontSave;
+    }
+
+    private void OnDestroy()
+    {
+        if (focusMaterial == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(focusMaterial);
+        }
+        else
+        {
+            DestroyImmediate(focusMaterial);
+        }
+
+        focusMaterial = null;
+    }
+}
